@@ -1,114 +1,300 @@
 const express = require('express');
 const app = express();
-const { Client, GatewayIntentBits, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { Client, Intents, MessageEmbed, MessageActionRow, MessageButton, Permissions, MessageSelectMenu } = require('discord.js');
 const Discord = require('discord.js');
 
 const client = new Client({
     intents: [
-        GatewayIntentBits.Guilds,
-        GatewayIntentBits.GuildMembers,
-        GatewayIntentBits.GuildEmojisAndStickers,
-        GatewayIntentBits.GuildIntegrations,
-        GatewayIntentBits.GuildWebhooks,
-        GatewayIntentBits.GuildInvites,
-        GatewayIntentBits.GuildVoiceStates,
-        GatewayIntentBits.GuildPresences,
-        GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.GuildMessageReactions,
-        GatewayIntentBits.GuildMessageTyping,
-        GatewayIntentBits.DirectMessages,
-        GatewayIntentBits.DirectMessageReactions,
-        GatewayIntentBits.DirectMessageTyping
+        Intents.FLAGS.GUILDS,
+        Intents.FLAGS.GUILD_MEMBERS,
+        Intents.FLAGS.GUILD_EMOJIS_AND_STICKERS,
+        Intents.FLAGS.GUILD_INTEGRATIONS,
+        Intents.FLAGS.GUILD_WEBHOOKS,
+        Intents.FLAGS.GUILD_INVITES,
+        Intents.FLAGS.GUILD_VOICE_STATES,
+        Intents.FLAGS.GUILD_PRESENCES,
+        Intents.FLAGS.GUILD_MESSAGES,
+        Intents.FLAGS.GUILD_MESSAGE_REACTIONS,
+        Intents.FLAGS.GUILD_MESSAGE_TYPING,
+        Intents.FLAGS.DIRECT_MESSAGES,
+        Intents.FLAGS.DIRECT_MESSAGE_REACTIONS,
+        Intents.FLAGS.DIRECT_MESSAGE_TYPING
     ],
     partials: [
-        Discord.Partials.Message,
-        Discord.Partials.Channel,
-        Discord.Partials.GuildMember,
-        Discord.Partials.Reaction,
-        Discord.Partials.User
+        'MESSAGE',
+        'CHANNEL',
+        'GUILD_MEMBER',
+        'REACTION',
+        'USER'
     ],
 });
 
+const allowedServers = new Map();
+const serverLanguages = new Map();
 
+client.on('guildCreate', guild => {
+    allowedServers.set(guild.id, true);
+    serverLanguages.set(guild.id, 'english');
+});
 
-
-const usedServers = [];
-client.on('ready', async () => {
-  console.log(`Logged in as ${client.user.tag}!`);
-  
-  const note = {
-    name: 'note',
-    description: 'Send a note to a specific channel',
-    options: [
-      {
-        type: 3, 
-        name: 'channel',
-        description: 'The channel to send the note to',
-        required: true,
-      }
-    ],
-  }
-
-  
-  // إنشاء سلاش كوماند جديد
-   await client.application.commands.create(note);
+client.on('guildDelete', guild => {
+    allowedServers.delete(guild.id);
+    serverLanguages.delete(guild.id);
 });
 
 client.on('interactionCreate', async interaction => {
-  if (!interaction.isCommand()) return;
+    if (!interaction.isCommand()) return;
 
-  // التحقق من أن الأمر هو /note
-  if (interaction.commandName === 'note') {
-    // التحقق مما إذا كان العضو هو مالك السيرفر
-    if (interaction.member.id !== interaction.guild.ownerId) {
-      // إذا لم يكن العضو مالك السيرفر، أرسل رسالة خطأ
-      const embed = new MessageEmbed()
-        .setTitle(language === 'english' ? `Note` : `ملاحظة`)
-        .setDescription('This command can only be used by the server owner!')
-        .setColor("#00FFFF")
-      await interaction.reply({ embeds: [embed] });
-      return;
+    const language = serverLanguages.get(interaction.guild.id) || 'english';
+
+    if (interaction.commandName === 'note') {
+        if (interaction.member.id !== interaction.guild.ownerId) {
+            const embed = new MessageEmbed()
+                .setDescription(
+                    language === 'english'
+                        ? 'This command can only be used by the server owner!'
+                        : 'يمكن استخدام هذا الأمر من قبل مالك السيرفر فقط!'
+                )
+                .setColor('#FF0000');
+            await interaction.reply({ embeds: [embed], ephemeral: true });
+            return;
+        }
+
+        const textChannels = interaction.guild.channels.cache.filter(channel => channel.isText());
+        const channelOptions = textChannels.map(channel => ({
+            label: channel.name,
+            value: channel.id,
+        }));
+
+        const row = new MessageActionRow().addComponents(
+            new MessageSelectMenu()
+                .setCustomId('select_channel')
+                .setPlaceholder(language === 'english' ? 'Select a channel' : 'اختر قناة')
+                .addOptions(channelOptions)
+        );
+
+        const embed = new MessageEmbed()
+            .setTitle(language === 'english' ? 'Select Channel' : 'اختر القناة')
+            .setDescription(
+                language === 'english'
+                    ? 'Please select the text channel where you want to send the message.'
+                    : 'الرجاء اختيار القناة النصية التي تريد إرسال الرسالة إليها.'
+            )
+            .setColor('#00FFFF');
+
+        await interaction.reply({ embeds: [embed], components: [row], ephemeral: true });
+
+        const filter = i => i.customId === 'select_channel' && i.user.id === interaction.user.id;
+        const collector = interaction.channel.createMessageComponentCollector({ filter, time: 60000 });
+
+        collector.on('collect', async i => {
+            await i.deferUpdate(); // تأجيل التفاعل
+
+            const selectedChannelId = i.values[0];
+            const targetChannel = interaction.guild.channels.cache.get(selectedChannelId);
+
+            const buttonRow = new MessageActionRow().addComponents(
+                new MessageButton()
+                    .setCustomId('allow')
+                    .setLabel(language === 'english' ? 'Allow' : 'السماح')
+                    .setStyle('SUCCESS'),
+                new MessageButton()
+                    .setCustomId('refuse')
+                    .setLabel(language === 'english' ? 'Refuse' : 'رفض')
+                    .setStyle('DANGER')
+            );
+
+            const embed = new MessageEmbed()
+                .setTitle(language === 'english' ? 'Note' : 'ملاحظة')
+                .setDescription(
+                    language === 'english'
+                        ? 'Do you want to allow the bot to suggest emojis from this server to other servers?'
+                        : 'هل تريد السماح للبوت باقتراح الإيموجيات من هذا السيرفر إلى سيرفرات أخرى؟'
+                )
+                .setColor('#00FFFF');
+
+            const sentMessage = await targetChannel.send({ embeds: [embed], components: [buttonRow] });
+
+            const confirmationEmbed = new MessageEmbed()
+                .setTitle(language === 'english' ? 'Message Sent' : 'تم إرسال الرسالة')
+                .setDescription(
+                    language === 'english'
+                        ? `The message has been sent to ${targetChannel}.`
+                        : `تم إرسال الرسالة إلى ${targetChannel}.`
+                )
+                .setColor('#00FF00');
+
+            await i.followUp({ embeds: [confirmationEmbed], components: [], ephemeral: true });
+
+            const buttonFilter = b => b.customId === 'allow' || b.customId === 'refuse';
+            const buttonCollector = sentMessage.createMessageComponentCollector({ buttonFilter, time: 60000 });
+
+            buttonCollector.on('collect', async b => {
+                await b.deferUpdate(); // تأجيل التفاعل
+
+                if (b.customId === 'allow') {
+                    allowedServers.set(interaction.guild.id, true);
+                    const allowEmbed = new MessageEmbed()
+                        .setTitle(language === 'english' ? '✔️ Permission Granted' : '✔️ تم منح الإذن')
+                        .setDescription(
+                            language === 'english'
+                                ? 'You have allowed the bot to suggest emojis from this server to other servers.'
+                                : 'لقد سمحت للبوت باقتراح الإيموجيات من هذا السيرفر إلى سيرفرات أخرى.'
+                        )
+                        .setColor('#00FF00');
+                    await b.followUp({ embeds: [allowEmbed], components: [], ephemeral: true });
+                } else if (b.customId === 'refuse') {
+                    allowedServers.set(interaction.guild.id, false);
+                    const refuseEmbed = new MessageEmbed()
+                        .setTitle(language === 'english' ? '❌ Permission Denied' : '❌ تم رفض الإذن')
+                        .setDescription(
+                            language === 'english'
+                                ? 'You have refused to allow the bot to suggest emojis from this server to other servers.'
+                                : 'لقد رفضت السماح للبوت باقتراح الإيموجيات من هذا السيرفر إلى سيرفرات أخرى.'
+                        )
+                        .setColor('#FF0000');
+                    await b.followUp({ embeds: [refuseEmbed], components: [], ephemeral: true });
+                }
+
+                buttonCollector.stop();
+            });
+
+            buttonCollector.on('end', collected => {
+                if (collected.size === 0) {
+                    const timeoutEmbed = new MessageEmbed()
+                        .setTitle(language === 'english' ? '⏳ Time Out' : '⏳ انتهى الوقت')
+                        .setDescription(
+                            language === 'english'
+                                ? 'You did not respond in time.'
+                                : 'لم تقم بالرد في الوقت المحدد.'
+                        )
+                        .setColor('#FFFF00');
+                    targetChannel.send({ embeds: [timeoutEmbed] });
+                }
+            });
+        });
+
+        collector.on('end', collected => {
+            if (collected.size === 0) {
+                const timeoutEmbed = new MessageEmbed()
+                    .setTitle(language === 'english' ? '⏳ Time Out' : '⏳ انتهى الوقت')
+                    .setDescription(
+                        language === 'english'
+                            ? 'You did not select a channel in time.'
+                            : 'لم تقم باختيار قناة في الوقت المحدد.'
+                    )
+                    .setColor('#FFFF00');
+                interaction.followUp({ embeds: [timeoutEmbed], ephemeral: true });
+            }
+        });
     }
-
-    // التحقق مما إذا كان الأمر قد تم استخدامه في هذا السيرفر من قبل
-    if (usedServers.includes(interaction.guildId)) {
-      // إذا تم استخدام الأمر من قبل، أرسل رسالة خطأ
-      const embed = new MessageEmbed()
-        .setTitle(language === 'english' ? `Note` : `ملاحظة`)
-        .setDescription('This command can only be used once per server!')
-        .setColor("#00FFFF")
-      await interaction.reply({ embeds: [embed] });
-      return;
-    }
-
-    // إضافة السيرفر إلى قائمة السيرفرات التي تم استخدام الأمر فيها
-    usedServers.push(interaction.guildId);
-
-    // احصل على القناة المحددة من خيارات الأمر
-    const channel = interaction.options.getChannel('channel');
-    // إذا تم تحديد قناة، أرسل الرسالة المحددة فيها
-    if (channel) {
-      const embed = new MessageEmbed()
-        .setTitle(language === 'english' ? `Note` : `ملاحظة`)
-        .setDescription('Note: The bot may suggest emojis from this server Nothing harmful will happen Do not worry                       \nملاحظة: قد يقترح البوت ايموجيات من هذا السيرفر ولكن لن يحدث شيء ضار لا داعي للقلق')
-        .setColor("#00FFFF")
-      channel.send({ embeds: [embed] });
-      await interaction.reply('Note sent successfully!');
-    } else {
-      const embed = new MessageEmbed()
-        .setTitle(language === 'english' ? `Note` : `ملاحظة`)
-        .setDescription('An error occurred while sending the note. Please try again.')
-        .setColor("#FF0000")
-      await interaction.reply({ embeds: [embed] });
-    }
-  }
 });
+
+client.on('interactionCreate', async interaction => {
+    if (!interaction.isCommand()) return;
+
+    const language = serverLanguages.get(interaction.guild.id) || 'english';
+
+    if (interaction.commandName === 'suggestemojis') {
+        if (!interaction.member.permissions.has(Permissions.FLAGS.MANAGE_EMOJIS_AND_STICKERS)) {
+            const embed = new MessageEmbed()
+                .setDescription(
+                    language === 'english'
+                        ? 'You do not have the required permission `MANAGE_EMOJIS_AND_STICKERS`. You need this permission to use this command👀'
+                        : 'ليس لديك صلاحية `MANAGE_EMOJIS_AND_STICKERS` تحتاج هذه الصلاحية حتى تستخدم الامر👀'
+                )
+                .setColor("#FF0000");
+            await interaction.reply({ embeds: [embed], ephemeral: true });
+            return;
+        }
+
+        let emojis = [];
+        client.guilds.cache.forEach(guild => {
+            if (allowedServers.get(guild.id) === true) {
+                guild.emojis.cache.forEach(emoji => {
+                    if (!emojis.includes(emoji) && 
+                        !interaction.guild.emojis.cache.find(e => e.name === emoji.name)) {
+                        emojis.push(emoji);
+                    }
+                });
+            }
+        });
+
+        if (emojis.length === 0) {
+            const embed = new MessageEmbed()
+                .setTitle(language === 'english' ? 'No Emojis Available' : 'لا توجد ايموجيات متاحة')
+                .setDescription(
+                    language === 'english'
+                        ? 'No emojis are available to suggest from other servers.'
+                        : 'لا توجد ايموجيات متاحة للاقتراح من سيرفرات أخرى.'
+                )
+                .setColor("#FF0000");
+            await interaction.reply({ embeds: [embed], ephemeral: true });
+            return;
+        }
+
+        emojis = emojis.sort(() => Math.random() - 0.5).slice(0, 5);
+        const embed = new MessageEmbed()
+            .setTitle(language === 'english' ? 'Suggested Emojis' : 'الإيموجيات المقترحة')
+            .setDescription(
+                language === 'english'
+                    ? 'Here are 5 suggested emojis from other servers:\n' + emojis.map(e => e.toString()).join(' ')
+                    : 'هذه 5 اقتراحات الايموجيات من سيرفرات أخرى:\n' + emojis.map(e => e.toString()).join(' ')
+            )
+            .setColor("#00FFFF")
+            .setFooter(
+                language === 'english'
+                    ? 'React with ✅ to add them or ❌ to cancel.'
+                    : 'اضغط على ✅ لإضافتها أو ❌ لإلغاء الأمر.'
+            );
+
+        const sentMessage = await interaction.reply({ embeds: [embed], fetchReply: true });
+
+        const filter = (reaction, user) => {
+            return ['✅', '❌'].includes(reaction.emoji.name) && user.id === interaction.user.id;
+        };
+
+        await sentMessage.react('✅');
+        await sentMessage.react('❌');
+
+        sentMessage.awaitReactions({ filter, max: 1, time: 60000, errors: ['time'] })
+            .then(collected => {
+                const reaction = collected.first();
+                if (reaction.emoji.name === '✅') {
+                    emojis.forEach(emoji => {
+                        if (!interaction.guild.emojis.cache.find(e => e.name === emoji.name)) {
+                            interaction.guild.emojis.create(emoji.url, emoji.name);
+                        }
+                    });
+                    interaction.followUp(
+                        language === 'english'
+                            ? 'The suggested emojis have been added successfully✅'
+                            : 'تمت إضافة الايموجيات المقترحة بنجاح✅'
+                    );
+                } else {
+                    interaction.followUp(
+                        language === 'english'
+                            ? 'The suggested emojis were not added❎'
+                            : 'لم يتم إضافة الايموجيات المقترحة❎'
+                    );
+                }
+            })
+            .catch(() => {
+                interaction.followUp(
+                    language === 'english'
+                        ? 'You did not respond in time.'
+                        : 'لم تقم بالرد في الوقت المحدد.'
+                );
+            });
+    }
+});
+
+
+
 
   
 
 
-const serverLanguages = new Map();
-let language = 'english';
 
 client.on('messageCreate', message => {
  if (!message.guild) return;
@@ -506,6 +692,64 @@ client.on('interactionCreate', async interaction => {
   }
 });
 
+client.on('interactionCreate', async interaction => {
+  if (!interaction.isCommand()) return;
+
+  if (interaction.commandName === 'language') {
+    const language = serverLanguages.get(interaction.guild.id) || 'english';
+
+    if (!interaction.member.permissions.has(Permissions.FLAGS.ADMINISTRATOR)) {
+      const embed = new MessageEmbed()
+        .setDescription(
+          language === 'english'
+            ? `You do not have the required permission \`ADMINISTRATOR\`. You need this permission to use this command👀`
+            : `ليس لديك صلاحية \`ADMINISTRATOR\` تحتاج هذه الصلاحية حتى تستخدم الامر👀`
+        )
+        .setColor('#FF0000');
+      await interaction.reply({ embeds: [embed], ephemeral: true });
+      return;
+    }
+
+    const embed = new MessageEmbed()
+      .setTitle('اختار اللغة - Choose the language')
+      .setColor('#00FFFF')
+      .setDescription('اختار اللغة التي تريد استخدامها - Choose the language you want to use')
+      .addFields(
+        { name: 'عربي', value: 'اضغط على 🇦 للاختيار', inline: true },
+        { name: 'English', value: 'Click on 🇺🇸 to select', inline: true }
+      );
+
+    await interaction.reply({ embeds: [embed] }).then(async () => {
+      const sentMessage = await interaction.fetchReply();
+      await sentMessage.react('🇦');
+      await sentMessage.react('🇺🇸');
+
+      const filter = (reaction, user) => {
+        return ['🇦', '🇺🇸'].includes(reaction.emoji.name) && user.id === interaction.user.id;
+      };
+
+      sentMessage.awaitReactions({ filter, max: 1, time: 60000, errors: ['time'] })
+        .then(collected => {
+          const reaction = collected.first();
+          if (reaction.emoji.name === '🇦') {
+            serverLanguages.set(interaction.guild.id, 'arabic');
+            interaction.followUp('لقد اخترت اللغة العربية');
+          } else {
+            serverLanguages.set(interaction.guild.id, 'english');
+            interaction.followUp('You have chosen English');
+          }
+        })
+        .catch(() => {
+          interaction.followUp(
+            language === 'english'
+              ? 'You did not choose a language in the allotted time'
+              : 'لم تقم باختيار اللغة في الوقت المحدد'
+          );
+        });
+    });
+  }
+});
+
 
 
 client.on('interactionCreate', async interaction => {
@@ -550,69 +794,17 @@ client.on('interactionCreate', async interaction => {
     await interaction.reply({ embeds: [embed] });
   }
 });
-
-
-client.on('interactionCreate', async interaction => {
-  if (!interaction.isCommand()) return;
-
-  if (interaction.commandName === 'language') {
-    if (!interaction.member.permissions.has(Discord.Permissions.FLAGS.ADMINISTRATOR)) {
-      const language = serverLanguages.get(interaction.guild.id) || 'english';
-      const embed = new MessageEmbed()
-        .setDescription(language === 'english' ? `You do not have the required permission \`ADMINISTRATOR\`. You need this permission to use this command👀` : `ليس لديك صلاحية \`ADMINISTRATOR\` تحتاج هذه الصلاحية حتى تستخدم الامر👀`)
-        .setColor("#FF0000")
-      interaction.reply({ embeds: [embed], ephemeral: true });
-      return;
-    }
-    const embed = new MessageEmbed()
-      .setTitle('اختار اللغة-Choose the language ')
-      .setColor('#00FFFF')
-      .setDescription('اختار اللغة التي تريد استخدامها------Choose the language you want to use ')
-      .addFields(
-        { name: 'عربي', value: 'اضغط على 🇦 للاختيار', inline: true },
-        { name: 'English', value: 'Click on 🇺🇸 to select', inline: true }
-      );
-    interaction.reply({ embeds: [embed] }).then(async () => {
-      const sentMessage = await interaction.fetchReply();
-      sentMessage.react('🇦');
-      sentMessage.react('🇺🇸');
-      const filter = (reaction, user) => {
-        return ['🇦', '🇺🇸'].includes(reaction.emoji.name) && user.id === interaction.user.id;
-      };
-      sentMessage.awaitReactions({ filter, max: 1, time: 60000, errors: ['time'] })
-        .then(collected => {
-          const reaction = collected.first();
-          if (reaction.emoji.name === '🇦') {
-            serverLanguages.set(interaction.guild.id, 'arabic');
-            interaction.followUp('لقد اخترت اللغة العربية');
-          } else {
-            serverLanguages.set(interaction.guild.id, 'english');
-            interaction.followUp('You have chosen English');
-          }
-        })
-        .catch(collected => {
-          const language = serverLanguages.get(interaction.guild.id) || 'english';
-          interaction.followUp(language === 'english' ? 'You did not choose a language in the allotted time' : 'لم تقم باختيار اللغة في الوقت المحدد');
-        });
-    });
-  }
-});
-
-
-let suggestedEmojis = [];
-
-client.on('messageCreate', message => {
-  if (message.content === prefix + 'suggestemojis') {
+  
+client.on('messageCreate', async message => {
+  if (message.content.startsWith(prefix + 'suggestemojis')) {
     if (!message.member.permissions.has(Discord.Permissions.FLAGS.MANAGE_EMOJIS_AND_STICKERS)) {
-      const language = serverLanguages.get(message.guild.id) || 'english';
       const embed = new MessageEmbed()
         .setDescription(language === 'english' ? `You do not have the required permission \`MANAGE_EMOJIS_AND_STICKERS\`. You need this permission to use this command👀` : `ليس لديك صلاحية \`MANAGE_EMOJIS_AND_STICKERS\` تحتاج هذه الصلاحية حتى تستخدم الامر👀`)
         .setColor("#FF0000")
-      message.channel.send({ embeds: [embed] }).then(msg => {
-        setTimeout(() => msg.delete(), 5000);
-      });
+      await message.reply({ embeds: [embed] });
       return;
     }
+
     let emojis = [];
     client.guilds.cache.forEach(guild => {
       guild.emojis.cache.forEach(emoji => {
@@ -621,64 +813,64 @@ client.on('messageCreate', message => {
         }
       });
     });
+
     emojis = emojis.sort(() => Math.random() - 0.5).slice(0, 5);
     suggestedEmojis = emojis;
+
     const language = serverLanguages.get(message.guild.id) || 'english';
     let reply = language === 'english' ? 'Here are 5 suggested emojis from different servers: ' : 'هذه 5 اقتراحات الايموجيات من سيرفرات مختلفة: ';
     emojis.forEach(emoji => {
       reply += `${emoji} `;
     });
     reply += language === 'english' ? '\nDo you want to add these emojis?' : '\nهل ترغب في إضافة هذه الايموجيات؟';
-    message.channel.send(reply);
-  } else if (message.content === 'نعم' || message.content.toLowerCase() === 'yes') {
-    if (suggestedEmojis.length > 0) {
-      suggestedEmojis.forEach(emoji => {
-        if (!message.guild.emojis.cache.find(e => e.name === emoji.name)) {
-          message.guild.emojis.create(emoji.url, emoji.name);
-        }
-      });
-      const language = serverLanguages.get(message.guild.id) || 'english';
-      message.channel.send(language === 'english' ? 'The suggested emojis have been added successfully✅' : 'تمت إضافة الايموجيات المقترحة بنجاح✅');
-      suggestedEmojis = [];
-    }
-  } else if (message.content === 'لا' || message.content.toLowerCase() === 'no') {
-    if (suggestedEmojis.length > 0) {
-      const language = serverLanguages.get(message.guild.id) || 'english';
-      message.channel.send(language === 'english' ? 'The suggested emojis were not added❎' : 'لم يتم إضافة الايموجيات المقترحة❎');
-      suggestedEmojis = [];
+
+    // الرد الأولي
+    await message.reply(reply);
+
+    // تفاعل المستخدم مع الرد
+    const filter = response => {
+      return (response.content.toLowerCase() === 'yes' || response.content === 'نعم' || response.content.toLowerCase() === 'no' || response.content === 'لا') && response.author.id === message.author.id;
+    };
+
+    try {
+      const collected = await message.channel.awaitMessages({ filter, max: 1, time: 60000, errors: ['time'] });
+      const response = collected.first();
+      if (response.content.toLowerCase() === 'yes' || response.content === 'نعم') {
+        suggestedEmojis.forEach(emoji => {
+          if (!message.guild.emojis.cache.find(e => e.name === emoji.name)) {
+            message.guild.emojis.create(emoji.url, emoji.name);
+          }
+        });
+        await message.reply(language === 'english' ? 'The suggested emojis have been added successfully✅' : 'تمت إضافة الايموجيات المقترحة بنجاح✅');
+      } else {
+        await message.reply(language === 'english' ? 'The suggested emojis were not added❎' : 'لم يتم إضافة الايموجيات المقترحة❎');
+      }
+    } catch (error) {
+      await message.reply(language === 'english' ? 'You did not respond in time.' : 'لم تقم بالرد في الوقت المحدد.');
     }
   }
 });
 
-client.on('interactionCreate', async interaction => {
-  if (!interaction.isCommand()) return;
 
-  if (interaction.commandName === 'suggestemojis') {
-    if (!interaction.member.permissions.has(Discord.Permissions.FLAGS.MANAGE_EMOJIS_AND_STICKERS)) {
-      interaction.reply({ content: "❌", ephemeral: true });
-      return;
-    }
-    let emojis = [];
-    client.guilds.cache.forEach(guild => {
-      guild.emojis.cache.forEach(emoji => {
-        if (!emojis.includes(emoji) && !interaction.guild.emojis.cache.find(e => e.name === emoji.name)) {
-          emojis.push(emoji);
-        }
-      });
-    });
-    emojis = emojis.sort(() => Math.random() - 0.5).slice(0, 5);
-    suggestedEmojis = emojis;
-    const language = serverLanguages.get(interaction.guild.id) || 'english';
-    let reply = language === 'english' ? 'Here are 5 suggested emojis from different servers: ' : 'هذه 5 اقتراحات الايموجيات من سيرفرات مختلفة: ';
-    emojis.forEach(emoji => {
-      reply += `${emoji} `;
-    });
-    reply += language === 'english' ? '\nDo you want to add these emojis?' : '\nهل ترغب في إضافة هذه الايموجيات؟';
-    interaction.reply(reply);
-  }
+
+client.on('ready', async () => {
+  console.log(`Logged in as ${client.user.tag}!`);
+
+  // تسجيل أمر suggestemojis
+  const suggestEmojisCommand = {
+    name: 'suggestemojis',
+    description: 'Suggest emojis from other servers',
+  };
+
+  // تسجيل الأمر الجديد
+  await client.application.commands.create(suggestEmojisCommand);
+
+  console.log('Command /suggestemojis has been registered.');
 });
 
-        
+
+
+
 // تأكد من أن الدالة التي تستخدم فيها 'await' هي دالة غير متزامنة
 client.on('ready', async () => {
   const renameEmojiCommand = {
@@ -746,4 +938,4 @@ client.on('ready', async () => {
 
 
 
-client.login(process.env.token);
+client.login(process.env.token)
