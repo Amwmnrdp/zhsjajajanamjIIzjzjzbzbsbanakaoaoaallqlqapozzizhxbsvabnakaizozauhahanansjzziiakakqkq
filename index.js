@@ -858,9 +858,15 @@ client.on('interactionCreate', async interaction => {
             const filter = i => i.customId === 'language_select' && i.user.id === interaction.user.id;
             const collector = msg.createMessageComponentCollector({ filter, time: 60000 });
             
-            collector.on('end', collected => {
+            collector.on('end', async collected => {
                 if (collected.size === 0) {
-                    msg.edit({ components: [] }).catch(() => {});
+                    const disabledSelectMenu = new StringSelectMenuBuilder()
+                        .setCustomId('language_select')
+                        .setPlaceholder(await t('Choose a language...', langCode))
+                        .setDisabled(true)
+                        .addOptions(options);
+                    const disabledRow = new ActionRowBuilder().addComponents(disabledSelectMenu);
+                    msg.edit({ components: [disabledRow] }).catch(() => {});
                 }
             });
         }
