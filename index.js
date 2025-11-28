@@ -145,6 +145,32 @@ async function t(text, langCode) {
 
 loadServerLanguages();
 
+async function preWarmCache() {
+    const commonMessages = [
+        'Language Updated!', 'Permission Settings', 'Allow bot to suggest emojis from this server?',
+        'Permission Granted', 'Bot can suggest emojis from this server.', 'Permission Denied',
+        'Bot will NOT suggest emojis.', 'Need ADMINISTRATOR permission!', 'Allow', 'Refuse',
+        'No Emojis Available', 'No emojis available.', 'Suggested Emojis', 'Here are 5 suggestions:',
+        'React with checkmark to add or X to cancel.', 'Emojis added!', 'Cancelled.', 'Timeout.',
+        'Added!', 'Invalid emoji!', 'already exists!', 'Error:', 'Image converted to emoji!',
+        'Image must be under 256KB', 'Invalid request:', 'Invalid image URL!', 'Image already used!',
+        'Need permission!', 'Emoji Already Converted!', 'This emoji has already been converted to a sticker!',
+        'Existing Sticker Name:', 'Sticker ID:', 'Delete the sticker to convert again.',
+        'Sticker Converted!', 'Sticker converted to emoji!', 'Sticker deleted!', 'Sticker not found!',
+        'Emojis Listed:', 'No emojis in this server', 'Emoji deleted!', 'Emoji renamed!',
+        'Need Manage Emojis permission!', 'Pong!', 'Response time:'
+    ];
+    
+    for (const lang of Object.keys(SUPPORTED_LANGUAGES)) {
+        if (lang !== 'en') {
+            for (const msg of commonMessages.slice(0, 10)) {
+                await t(msg, lang).catch(() => {});
+            }
+        }
+    }
+    console.log('✅ Cache pre-warmed');
+}
+
 function parseEmoji(emoji) {
     const regex = /<(a)?:(\w+):(\d+)>/;
     const match = emoji.match(regex);
@@ -330,12 +356,18 @@ client.once('ready', async () => {
                         required: true
                     }
                 ]
+            },
+            {
+                name: 'ping',
+                description: 'Check bot response speed'
             }
         ];
 
         await client.application.commands.set(commands);
         console.log('✅ Slash commands registered!');
         console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+        
+        preWarmCache();
     } catch (error) {
         console.error('❌ Error:', error);
     }
@@ -379,6 +411,16 @@ client.on('interactionCreate', async interaction => {
     const langCode = serverLanguages.get(interaction.guild.id) || 'en';
 
     try {
+        if (interaction.commandName === 'ping') {
+            const latency = Math.round(client.ws.ping);
+            const embed = new EmbedBuilder()
+                .setTitle('🏓 ' + await t('Pong!', langCode))
+                .setDescription(await t('Response time:', langCode) + ' ' + latency + 'ms')
+                .setColor('#00FFFF');
+            await interaction.reply({ embeds: [embed] });
+            return;
+        }
+
         if (interaction.commandName === 'permission') {
             if (!interaction.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
                 const embed = new EmbedBuilder()
