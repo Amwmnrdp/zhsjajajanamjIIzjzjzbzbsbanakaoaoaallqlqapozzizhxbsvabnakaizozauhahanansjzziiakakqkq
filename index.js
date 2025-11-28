@@ -487,7 +487,6 @@ client.on('interactionCreate', async interaction => {
 
             const existingStickers = interaction.guild.stickers.cache;
             const duplicateByName = existingStickers.find(s => s.name.toLowerCase() === stickerName.toLowerCase());
-            const duplicateByUrl = existingStickers.find(s => s.description && s.description.includes(imageUrl));
 
             if (duplicateByName) {
                 const stickerUrl = `https://cdn.discordapp.com/stickers/${duplicateByName.id}.png`;
@@ -503,25 +502,11 @@ client.on('interactionCreate', async interaction => {
                 return;
             }
 
-            if (duplicateByUrl) {
-                const stickerUrl = `https://cdn.discordapp.com/stickers/${duplicateByUrl.id}.png`;
-                const embed = new EmbedBuilder()
-                    .setTitle(language === 'english' ? '⚠️ Image Already Converted!' : '⚠️ تم تحويل هذه الصورة مسبقاً!')
-                    .setDescription(language === 'english' 
-                        ? `This image has already been converted to a sticker!\n\n**Existing Sticker Name:** ${duplicateByUrl.name}\n**Sticker ID:** ${duplicateByUrl.id}`
-                        : `تم تحويل هذه الصورة إلى ملصق مسبقاً!\n\n**اسم الملصق الموجود:** ${duplicateByUrl.name}\n**معرف الملصق:** ${duplicateByUrl.id}`)
-                    .setThumbnail(stickerUrl)
-                    .setColor('#FF9900')
-                    .setFooter({ text: language === 'english' ? 'This sticker already exists in your server.' : 'هذا الملصق موجود بالفعل في خادمك.' });
-                await interaction.reply({ embeds: [embed] });
-                return;
-            }
-
             try {
                 const sticker = await interaction.guild.stickers.create({
                     file: imageUrl,
                     name: stickerName,
-                    description: language === 'english' ? `Converted from image: ${imageUrl}` : `تم التحويل من صورة: ${imageUrl}`,
+                    description: language === 'english' ? 'Converted from image' : 'تم التحويل من صورة',
                     reason: `By ${interaction.user.tag}`
                 });
 
