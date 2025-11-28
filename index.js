@@ -29,6 +29,7 @@ const allowedServers = new Map();
 const serverLanguages = new Map();
 const usedUrls = {};
 let suggestedEmojis = [];
+const stickerDeletionSessions = new Map();
 const SERVERS_FILE = 'servers.json';
 
 function parseEmoji(emoji) {
@@ -191,6 +192,10 @@ client.once('ready', async () => {
                         required: true
                     }
                 ]
+            },
+            {
+                name: 'delete_sticker',
+                description: 'Delete a sticker'
             }
         ];
 
@@ -699,6 +704,38 @@ client.on('interactionCreate', async interaction => {
                 await interaction.reply({ embeds: [embed] });
             }
         }
+
+        if (interaction.commandName === 'delete_sticker') {
+            if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageEmojisAndStickers)) {
+                const embed = new EmbedBuilder().setDescription(language === 'english' ? '❌ Need permission!' : '❌ تحتاج صلاحية!').setColor('#FF0000');
+                await interaction.reply({ embeds: [embed], ephemeral: true });
+                return;
+            }
+
+            const embed = new EmbedBuilder()
+                .setTitle(language === 'english' ? '📌 Send or Reply with Sticker' : '📌 أرسل أو رد باستخدام ملصق')
+                .setDescription(language === 'english' 
+                    ? 'Reply to this message using the sticker you want to delete, and I will delete it for you.'
+                    : 'رد على هذه الرسالة باستخدام الملصق الذي تريد حذفه، وسأحذفه لك.')
+                .setColor('#FF9900')
+                .setFooter({ text: language === 'english' ? 'Waiting for your sticker...' : 'في انتظار ملصقك...' });
+
+            const msg = await interaction.reply({ embeds: [embed], fetchReply: true });
+            
+            stickerDeletionSessions.set(msg.id, {
+                guildId: interaction.guild.id,
+                userId: interaction.user.id,
+                language: language,
+                messageId: msg.id,
+                channelId: msg.channel.id
+            });
+
+            setTimeout(() => {
+                if (stickerDeletionSessions.has(msg.id)) {
+                    stickerDeletionSessions.delete(msg.id);
+                }
+            }, 60000);
+        }
     } catch (error) {
         console.error('Error:', error);
     }
@@ -707,6 +744,49 @@ client.on('interactionCreate', async interaction => {
 client.on('messageCreate', async message => {
     if (message.author.bot || !message.guild) return;
     const language = serverLanguages.get(message.guild.id) || 'english';
+
+    // Handle sticker deletion replies
+    if (message.reference && message.stickers && message.stickers.size > 0) {
+        try {
+            const repliedTo = await message.channel.messages.fetch(message.reference.messageId);
+            const session = stickerDeletionSessions.get(repliedTo.id);
+            
+            if (session && session.userId === message.author.id && session.guildId === message.guild.id) {
+                const sticker = message.stickers.first();
+                const serverStickers = message.guild.stickers.cache;
+                const stickerToDelete = serverStickers.find(s => s.id === sticker.id);
+
+                if (stickerToDelete) {
+                    try {
+                        await stickerToDelete.delete();
+                        const embed = new EmbedBuilder()
+                            .setTitle(language === 'english' ? '✅ Sticker Deleted!' : '✅ تم حذف الملصق!')
+                            .setDescription(language === 'english' 
+                                ? `Successfully deleted sticker: **${stickerToDelete.name}**`
+                                : `تم حذف الملصق بنجاح: **${stickerToDelete.name}**`)
+                            .setColor('#00FF00')
+                            .setFooter({ text: language === 'english' ? 'Sticker removed from server.' : 'تم إزالة الملصق من الخادم.' });
+                        await message.reply({ embeds: [embed] });
+                        stickerDeletionSessions.delete(repliedTo.id);
+                    } catch (error) {
+                        const embed = new EmbedBuilder()
+                            .setDescription(`❌ Error: ${error.message}`)
+                            .setColor('#FF0000');
+                        await message.reply({ embeds: [embed] });
+                    }
+                } else {
+                    const embed = new EmbedBuilder()
+                        .setDescription(language === 'english' 
+                            ? '❌ Sticker not found in this server!'
+                            : '❌ الملصق غير موجود في هذا الخادم!')
+                        .setColor('#FF0000');
+                    await message.reply({ embeds: [embed] });
+                }
+            }
+        } catch (error) {
+            console.error('Sticker deletion error:', error);
+        }
+    }
 
     if (message.content.startsWith(prefix + 'help')) {
         message.channel.send(language === 'english' ? '**Check your DM**' : '**شوف خاصك**').then(m => setTimeout(() => m.delete(), 5000));
@@ -746,7 +826,11 @@ You can convert an emoji to a sticker using this slash command **/emoji_to_stick
 
 ⌄ـــــــــــــــــــــــــــProEmojiـــــــــــــــــــــــــــــ⌄
 
-You can convert an image to a sticker using this slash command **/image_to_sticker** and the image will be turned into a beautiful sticker!`
+You can convert an image to a sticker using this slash command **/image_to_sticker** and the image will be turned into a beautiful sticker!
+
+⌄ـــــــــــــــــــــــــــProEmojiـــــــــــــــــــــــــــــ⌄
+
+You can delete a sticker using this slash command **/delete_sticker** and then reply with the sticker you want to delete!`
                     : `**أهلا بك هذا قائمة المساعدة الخاصة بي**
 ⌄ـــــــــــــــــــــــــــProEmojiـــــــــــــــــــــــــــــ⌄
 
@@ -778,7 +862,11 @@ You can convert an image to a sticker using this slash command **/image_to_stick
 
 ⌄ـــــــــــــــــــــــــــProEmojiـــــــــــــــــــــــــــــ⌄
 
-يمكنك تحويل صورة إلى ملصق باستخدام أمر الشرطة المائلة **/image_to_sticker** وسيتم تحويل الصورة إلى ملصق جميل!`
+يمكنك تحويل صورة إلى ملصق باستخدام أمر الشرطة المائلة **/image_to_sticker** وسيتم تحويل الصورة إلى ملصق جميل!
+
+⌄ـــــــــــــــــــــــــــProEmojiـــــــــــــــــــــــــــــ⌄
+
+يمكنك حذف ملصق باستخدام أمر الشرطة المائلة **/delete_sticker** ثم رد برسالة تحتوي على الملصق الذي تريد حذفه!`
             )
             .setColor('#0099ff');
 
