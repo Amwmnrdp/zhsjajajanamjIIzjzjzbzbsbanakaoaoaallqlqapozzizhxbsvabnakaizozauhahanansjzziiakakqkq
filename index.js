@@ -9,9 +9,11 @@ const {
     ButtonBuilder, 
     ButtonStyle, 
     ApplicationCommandOptionType, 
-    PermissionsBitField 
+    PermissionsBitField,
+    StringSelectMenuBuilder
 } = require('discord.js');
 const isImageUrl = require('is-image-url');
+const translate = require('google-translate-api-x');
 
 const client = new Client({
     intents: [
@@ -35,6 +37,113 @@ const convertedEmojisToStickers = new Map();
 const convertedImagesToStickers = new Map();
 const convertedStickersToEmojis = new Map();
 const SERVERS_FILE = 'servers.json';
+const LANGUAGES_FILE = 'languages.json';
+const translationCache = new Map();
+
+const SUPPORTED_LANGUAGES = {
+    'en': { name: 'English', flag: '🇺🇸', native: 'English' },
+    'ar': { name: 'Arabic', flag: '<:Syria:1443915175379079208>', native: 'العربية' },
+    'zh': { name: 'Chinese', flag: '🇨🇳', native: '中文' },
+    'es': { name: 'Spanish', flag: '🇪🇸', native: 'Español' },
+    'ru': { name: 'Russian', flag: '🇷🇺', native: 'Русский' },
+    'tr': { name: 'Turkish', flag: '🇹🇷', native: 'Türkçe' },
+    'fr': { name: 'French', flag: '🇫🇷', native: 'Français' },
+    'de': { name: 'German', flag: '🇩🇪', native: 'Deutsch' },
+    'it': { name: 'Italian', flag: '🇮🇹', native: 'Italiano' },
+    'ja': { name: 'Japanese', flag: '🇯🇵', native: '日本語' },
+    'ko': { name: 'Korean', flag: '🇰🇷', native: '한국어' },
+    'pt': { name: 'Portuguese', flag: '🇧🇷', native: 'Português' }
+};
+
+function readLanguagesFile() {
+    try {
+        if (!fs.existsSync(LANGUAGES_FILE)) {
+            fs.writeFileSync(LANGUAGES_FILE, '{}');
+            return {};
+        }
+        const data = fs.readFileSync(LANGUAGES_FILE, 'utf8');
+        return JSON.parse(data);
+    } catch (error) {
+        console.error('⚠️ Warning: Could not read languages file:', error.message);
+        return {};
+    }
+}
+
+function writeLanguagesFile(languages) {
+    try {
+        fs.writeFileSync(LANGUAGES_FILE, JSON.stringify(languages, null, 2));
+    } catch (error) {
+        console.error('⚠️ Warning: Could not write languages file:', error.message);
+    }
+}
+
+const LEGACY_LANGUAGE_MAP = {
+    'english': 'en',
+    'arabic': 'ar',
+    'chinese': 'zh',
+    'spanish': 'es',
+    'russian': 'ru',
+    'turkish': 'tr',
+    'french': 'fr',
+    'german': 'de',
+    'italian': 'it',
+    'japanese': 'ja',
+    'korean': 'ko',
+    'portuguese': 'pt'
+};
+
+function loadServerLanguages() {
+    const languages = readLanguagesFile();
+    let needsSave = false;
+    
+    for (const [guildId, langCode] of Object.entries(languages)) {
+        const normalizedCode = LEGACY_LANGUAGE_MAP[langCode.toLowerCase()] || langCode;
+        if (normalizedCode !== langCode) {
+            languages[guildId] = normalizedCode;
+            needsSave = true;
+        }
+        serverLanguages.set(guildId, normalizedCode);
+    }
+    
+    if (needsSave) {
+        writeLanguagesFile(languages);
+        console.log('✅ Migrated legacy language codes to ISO format');
+    }
+}
+
+function saveServerLanguage(guildId, langCode) {
+    const languages = readLanguagesFile();
+    languages[guildId] = langCode;
+    writeLanguagesFile(languages);
+    serverLanguages.set(guildId, langCode);
+}
+
+async function t(text, langCode) {
+    if (!text || langCode === 'en') return text;
+    
+    const cacheKey = `${langCode}:${text}`;
+    if (translationCache.has(cacheKey)) {
+        return translationCache.get(cacheKey);
+    }
+    
+    try {
+        const result = await translate(text, { from: 'en', to: langCode });
+        const translated = result.text;
+        translationCache.set(cacheKey, translated);
+        
+        if (translationCache.size > 5000) {
+            const keysToDelete = Array.from(translationCache.keys()).slice(0, 1000);
+            keysToDelete.forEach(key => translationCache.delete(key));
+        }
+        
+        return translated;
+    } catch (error) {
+        console.error('⚠️ Translation error:', error.message);
+        return text;
+    }
+}
+
+loadServerLanguages();
 
 function parseEmoji(emoji) {
     const regex = /<(a)?:(\w+):(\d+)>/;
@@ -234,7 +343,7 @@ client.once('ready', async () => {
 
 client.on('guildCreate', guild => {
     allowedServers.set(guild.id, true);
-    serverLanguages.set(guild.id, 'english');
+    serverLanguages.set(guild.id, 'en');
     const servers = readServersFile();
     if (!servers.includes(guild.name)) {
         servers.push(guild.name);
@@ -253,27 +362,40 @@ client.on('guildDelete', guild => {
 });
 
 client.on('interactionCreate', async interaction => {
+    if (interaction.isStringSelectMenu() && interaction.customId === 'language_select') {
+        const langCode = interaction.values[0];
+        const langInfo = SUPPORTED_LANGUAGES[langCode];
+        saveServerLanguage(interaction.guild.id, langCode);
+        
+        const embed = new EmbedBuilder()
+            .setTitle(await t('Language Updated!', langCode))
+            .setDescription(`${langInfo.flag} ${langInfo.native} (${langInfo.name})`)
+            .setColor('#00FF00');
+        await interaction.update({ embeds: [embed], components: [] });
+        return;
+    }
+    
     if (!interaction.isCommand()) return;
-    const language = serverLanguages.get(interaction.guild.id) || 'english';
+    const langCode = serverLanguages.get(interaction.guild.id) || 'en';
 
     try {
         if (interaction.commandName === 'permission') {
             if (!interaction.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
                 const embed = new EmbedBuilder()
-                    .setDescription(language === 'english' ? '❌ Need ADMINISTRATOR permission!' : '❌ تحتاج صلاحية المسؤول!')
+                    .setDescription('❌ ' + await t('Need ADMINISTRATOR permission!', langCode))
                     .setColor('#FF0000');
                 await interaction.reply({ embeds: [embed], ephemeral: true });
                 return;
             }
 
             const buttonRow = new ActionRowBuilder().addComponents(
-                new ButtonBuilder().setCustomId('allow').setLabel(language === 'english' ? '✅ Allow' : '✅ السماح').setStyle(ButtonStyle.Success),
-                new ButtonBuilder().setCustomId('refuse').setLabel(language === 'english' ? '❌ Refuse' : '❌ رفض').setStyle(ButtonStyle.Danger)
+                new ButtonBuilder().setCustomId('allow').setLabel('✅ ' + await t('Allow', langCode)).setStyle(ButtonStyle.Success),
+                new ButtonBuilder().setCustomId('refuse').setLabel('❌ ' + await t('Refuse', langCode)).setStyle(ButtonStyle.Danger)
             );
 
             const embed = new EmbedBuilder()
-                .setTitle(language === 'english' ? '🔐 Permission Settings' : '🔐 إعدادات الإذن')
-                .setDescription(language === 'english' ? 'Allow bot to suggest emojis from this server?' : 'السماح للبوت باقتراح الإيموجيات من هذا السيرفر؟')
+                .setTitle('🔐 ' + await t('Permission Settings', langCode))
+                .setDescription(await t('Allow bot to suggest emojis from this server?', langCode))
                 .setColor('#00FFFF');
 
             await interaction.reply({ embeds: [embed], components: [buttonRow] });
@@ -285,11 +407,11 @@ client.on('interactionCreate', async interaction => {
                 await i.deferUpdate();
                 if (i.customId === 'allow') {
                     allowedServers.set(interaction.guild.id, true);
-                    const e = new EmbedBuilder().setTitle('✅ Permission Granted').setDescription(language === 'english' ? 'Bot can suggest emojis from this server.' : 'يمكن للبوت اقتراح الإيموجيات من هذا السيرفر.').setColor('#00FF00');
+                    const e = new EmbedBuilder().setTitle('✅ ' + await t('Permission Granted', langCode)).setDescription(await t('Bot can suggest emojis from this server.', langCode)).setColor('#00FF00');
                     await i.editReply({ embeds: [e], components: [] });
                 } else {
                     allowedServers.set(interaction.guild.id, false);
-                    const e = new EmbedBuilder().setTitle('❌ Permission Denied').setDescription(language === 'english' ? 'Bot will NOT suggest emojis.' : 'لن يقترح البوت الإيموجيات.').setColor('#FF0000');
+                    const e = new EmbedBuilder().setTitle('❌ ' + await t('Permission Denied', langCode)).setDescription(await t('Bot will NOT suggest emojis.', langCode)).setColor('#FF0000');
                     await i.editReply({ embeds: [e], components: [] });
                 }
                 collector.stop();
@@ -298,7 +420,7 @@ client.on('interactionCreate', async interaction => {
 
         if (interaction.commandName === 'suggestemojis') {
             if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageEmojisAndStickers)) {
-                const embed = new EmbedBuilder().setDescription(language === 'english' ? '❌ Need Manage Emojis permission!' : '❌ تحتاج صلاحية إدارة الإيموجيات!').setColor('#FF0000');
+                const embed = new EmbedBuilder().setDescription('❌ ' + await t('Need Manage Emojis permission!', langCode)).setColor('#FF0000');
                 await interaction.reply({ embeds: [embed], ephemeral: true });
                 return;
             }
@@ -315,17 +437,17 @@ client.on('interactionCreate', async interaction => {
             });
 
             if (emojis.length === 0) {
-                const embed = new EmbedBuilder().setTitle(language === 'english' ? '❌ No Emojis Available' : '❌ لا توجد ايموجيات').setDescription(language === 'english' ? 'No emojis available.' : 'لا توجد ايموجيات متاحة.').setColor('#FF0000');
+                const embed = new EmbedBuilder().setTitle('❌ ' + await t('No Emojis Available', langCode)).setDescription(await t('No emojis available.', langCode)).setColor('#FF0000');
                 await interaction.reply({ embeds: [embed], ephemeral: true });
                 return;
             }
 
             emojis = emojis.sort(() => Math.random() - 0.5).slice(0, 5);
             const embed = new EmbedBuilder()
-                .setTitle(language === 'english' ? '💡 Suggested Emojis' : '💡 الإيموجيات المقترحة')
-                .setDescription((language === 'english' ? 'Here are 5 suggestions:\n' : 'هذه 5 اقتراحات:\n') + emojis.map(e => e.toString()).join(' '))
+                .setTitle('💡 ' + await t('Suggested Emojis', langCode))
+                .setDescription(await t('Here are 5 suggestions:', langCode) + '\n' + emojis.map(e => e.toString()).join(' '))
                 .setColor('#00FFFF')
-                .setFooter({ text: language === 'english' ? 'React ✅ to add or ❌ to cancel.' : 'تفاعل بـ ✅ للإضافة أو ❌ للإلغاء.' });
+                .setFooter({ text: await t('React with checkmark to add or X to cancel.', langCode) });
 
             const msg = await interaction.reply({ embeds: [embed], fetchReply: true });
             try {
@@ -335,6 +457,7 @@ client.on('interactionCreate', async interaction => {
                 console.error('⚠️ Warning: Could not add reactions:', error.message);
             }
 
+            const storedLangCode = langCode;
             const filter = (reaction, user) => ['✅', '❌'].includes(reaction.emoji.name) && user.id === interaction.user.id;
             msg.awaitReactions({ filter, max: 1, time: 60000, errors: ['time'] })
                 .then(async collected => {
@@ -349,17 +472,17 @@ client.on('interactionCreate', async interaction => {
                                 }
                             }
                         }
-                        await interaction.followUp(language === 'english' ? '✅ Emojis added!' : '✅ تمت الإضافة!');
+                        await interaction.followUp('✅ ' + await t('Emojis added!', storedLangCode));
                     } else {
-                        await interaction.followUp(language === 'english' ? '❌ Cancelled.' : '❌ تم الإلغاء.');
+                        await interaction.followUp('❌ ' + await t('Cancelled.', storedLangCode));
                     }
                 })
-                .catch(() => interaction.followUp(language === 'english' ? '⏳ Timeout.' : '⏳ انتهى الوقت.'));
+                .catch(async () => interaction.followUp('⏳ ' + await t('Timeout.', storedLangCode)));
         }
 
         if (interaction.commandName === 'addemoji') {
             if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageEmojisAndStickers)) {
-                const embed = new EmbedBuilder().setDescription(language === 'english' ? '❌ Need permission!' : '❌ تحتاج صلاحية!').setColor('#FF0000');
+                const embed = new EmbedBuilder().setDescription('❌ ' + await t('Need permission!', langCode)).setColor('#FF0000');
                 await interaction.reply({ embeds: [embed], ephemeral: true });
                 return;
             }
@@ -369,13 +492,13 @@ client.on('interactionCreate', async interaction => {
             let info = parseEmoji(emoji);
 
             if (!info.id) {
-                const embed = new EmbedBuilder().setDescription(language === 'english' ? '❌ Invalid emoji!' : '❌ ايموجي غير صالح!').setColor('#FF0000');
+                const embed = new EmbedBuilder().setDescription('❌ ' + await t('Invalid emoji!', langCode)).setColor('#FF0000');
                 await interaction.reply({ embeds: [embed] });
                 return;
             }
 
             if (interaction.guild.emojis.cache.find(e => e.name === info.name)) {
-                const embed = new EmbedBuilder().setDescription(language === 'english' ? `⚠️ ${emoji} already exists!` : `⚠️ ${emoji} موجود بالفعل!`).setColor('#FF9900');
+                const embed = new EmbedBuilder().setDescription('⚠️ ' + emoji + ' ' + await t('already exists!', langCode)).setColor('#FF9900');
                 await interaction.reply({ embeds: [embed] });
                 return;
             }
@@ -384,17 +507,17 @@ client.on('interactionCreate', async interaction => {
                 let type = info.animated ? '.gif' : '.png';
                 let url = `https://cdn.discordapp.com/emojis/${info.id + type}`;
                 const emj = await interaction.guild.emojis.create({ attachment: url, name: name || info.name, reason: `By ${interaction.user.tag}` });
-                const embed = new EmbedBuilder().setDescription(language === 'english' ? `✅ Added! ${emj}` : `✅ تمت الإضافة! ${emj}`).setColor('#00FF00');
+                const embed = new EmbedBuilder().setDescription('✅ ' + await t('Added!', langCode) + ' ' + emj).setColor('#00FF00');
                 await interaction.reply({ embeds: [embed] });
             } catch (error) {
-                const embed = new EmbedBuilder().setDescription(`❌ Error: ${error.message}`).setColor('#FF0000');
+                const embed = new EmbedBuilder().setDescription('❌ ' + await t('Error:', langCode) + ' ' + error.message).setColor('#FF0000');
                 await interaction.reply({ embeds: [embed] });
             }
         }
 
         if (interaction.commandName === 'image_to_emoji') {
             if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageEmojisAndStickers)) {
-                const embed = new EmbedBuilder().setDescription(language === 'english' ? '❌ Need permission!' : '❌ تحتاج صلاحية!').setColor('#FF0000');
+                const embed = new EmbedBuilder().setDescription('❌ ' + await t('Need permission!', langCode)).setColor('#FF0000');
                 await interaction.reply({ embeds: [embed], ephemeral: true });
                 return;
             }
@@ -403,13 +526,13 @@ client.on('interactionCreate', async interaction => {
             const urlOption = interaction.options.getString('url');
 
             if (!isImageUrl(urlOption)) {
-                const embed = new EmbedBuilder().setDescription(language === 'english' ? '❌ Invalid image URL!' : '❌ رابط صورة غير صالح!').setColor('#FF0000');
+                const embed = new EmbedBuilder().setDescription('❌ ' + await t('Invalid image URL!', langCode)).setColor('#FF0000');
                 await interaction.reply({ embeds: [embed] });
                 return;
             }
 
             if (usedUrls[urlOption] && usedUrls[urlOption].includes(interaction.guild.id)) {
-                const embed = new EmbedBuilder().setDescription(language === 'english' ? '⚠️ Image already used!' : '⚠️ الصورة مستخدمة بالفعل!').setColor('#FF9900');
+                const embed = new EmbedBuilder().setDescription('⚠️ ' + await t('Image already used!', langCode)).setColor('#FF9900');
                 await interaction.reply({ embeds: [embed] });
                 return;
             }
@@ -418,14 +541,14 @@ client.on('interactionCreate', async interaction => {
                 await interaction.guild.emojis.create({ attachment: urlOption, name: nameOption });
                 usedUrls[urlOption] = usedUrls[urlOption] || [];
                 usedUrls[urlOption].push(interaction.guild.id);
-                const embed = new EmbedBuilder().setDescription(language === 'english' ? '✅ Image converted to emoji!' : '✅ تم تحويل الصورة إلى إيموجي!').setColor('#00FF00');
+                const embed = new EmbedBuilder().setDescription('✅ ' + await t('Image converted to emoji!', langCode)).setColor('#00FF00');
                 await interaction.reply({ embeds: [embed] });
             } catch (error) {
                 const errorMsg = error.code === 50138 ? 
-                    (language === 'english' ? 'Image must be under 256KB' : 'يجب أن تكون الصورة أقل من 256 كيلوبايت') :
+                    await t('Image must be under 256KB', langCode) :
                     error.code === 50035 ?
-                    (language === 'english' ? 'Invalid request: ' : 'طلب غير صالح: ') + error.message :
-                    (language === 'english' ? 'Error: ' : 'خطأ: ') + error.message;
+                    await t('Invalid request:', langCode) + ' ' + error.message :
+                    await t('Error:', langCode) + ' ' + error.message;
                 const embed = new EmbedBuilder().setDescription(`❌ ${errorMsg}`).setColor('#FF0000');
                 await interaction.reply({ embeds: [embed] });
                 console.error(`⚠️ Discord Error in image_to_emoji:`, error.code, error.message);
@@ -434,7 +557,7 @@ client.on('interactionCreate', async interaction => {
 
         if (interaction.commandName === 'emoji_to_sticker') {
             if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageEmojisAndStickers)) {
-                const embed = new EmbedBuilder().setDescription(language === 'english' ? '❌ Need permission!' : '❌ تحتاج صلاحية!').setColor('#FF0000');
+                const embed = new EmbedBuilder().setDescription('❌ ' + await t('Need permission!', langCode)).setColor('#FF0000');
                 await interaction.reply({ embeds: [embed], ephemeral: true });
                 return;
             }
@@ -444,7 +567,7 @@ client.on('interactionCreate', async interaction => {
             const match = emojiInput.match(/<(a)?:(\w+):(\d+)>/);
 
             if (!match) {
-                const embed = new EmbedBuilder().setDescription(language === 'english' ? '❌ Invalid emoji!' : '❌ ايموجي غير صالح!').setColor('#FF0000');
+                const embed = new EmbedBuilder().setDescription('❌ ' + await t('Invalid emoji!', langCode)).setColor('#FF0000');
                 await interaction.reply({ embeds: [embed] });
                 return;
             }
@@ -459,13 +582,11 @@ client.on('interactionCreate', async interaction => {
                 const stickerInfo = convertedEmojisToStickers.get(trackingKey);
                 const stickerUrl = `https://cdn.discordapp.com/stickers/${stickerInfo.stickerId}.png`;
                 const embed = new EmbedBuilder()
-                    .setTitle(language === 'english' ? '⚠️ Emoji Already Converted!' : '⚠️ تم تحويل هذا الإيموجي مسبقاً!')
-                    .setDescription(language === 'english' 
-                        ? `This emoji has already been converted to a sticker!\n\n**Existing Sticker Name:** ${stickerInfo.stickerName}\n**Sticker ID:** ${stickerInfo.stickerId}\n\nDelete the sticker to convert again.`
-                        : `تم تحويل هذا الإيموجي إلى ملصق مسبقاً!\n\n**اسم الملصق الموجود:** ${stickerInfo.stickerName}\n**معرف الملصق:** ${stickerInfo.stickerId}\n\nاحذف الملصق لتحويله مجدداً.`)
+                    .setTitle('⚠️ ' + await t('Emoji Already Converted!', langCode))
+                    .setDescription(await t('This emoji has already been converted to a sticker!', langCode) + `\n\n**${await t('Existing Sticker Name:', langCode)}** ${stickerInfo.stickerName}\n**${await t('Sticker ID:', langCode)}** ${stickerInfo.stickerId}\n\n${await t('Delete the sticker to convert again.', langCode)}`)
                     .setThumbnail(stickerUrl)
                     .setColor('#FF9900')
-                    .setFooter({ text: language === 'english' ? 'This conversion is already done.' : 'تم إجراء هذا التحويل بالفعل.' });
+                    .setFooter({ text: await t('This conversion is already done.', langCode) });
                 await interaction.reply({ embeds: [embed] });
                 return;
             }
@@ -476,13 +597,11 @@ client.on('interactionCreate', async interaction => {
             if (duplicateByName) {
                 const stickerUrl = `https://cdn.discordapp.com/stickers/${duplicateByName.id}.png`;
                 const embed = new EmbedBuilder()
-                    .setTitle(language === 'english' ? '⚠️ Sticker Name Already Exists!' : '⚠️ اسم الملصق موجود بالفعل!')
-                    .setDescription(language === 'english' 
-                        ? `A sticker with this name already exists!\n\n**Existing Sticker Name:** ${duplicateByName.name}\n**Sticker ID:** ${duplicateByName.id}`
-                        : `يوجد ملصق بهذا الاسم بالفعل!\n\n**اسم الملصق الموجود:** ${duplicateByName.name}\n**معرف الملصق:** ${duplicateByName.id}`)
+                    .setTitle('⚠️ ' + await t('Sticker Name Already Exists!', langCode))
+                    .setDescription(await t('A sticker with this name already exists!', langCode) + `\n\n**${await t('Existing Sticker Name:', langCode)}** ${duplicateByName.name}\n**${await t('Sticker ID:', langCode)}** ${duplicateByName.id}`)
                     .setThumbnail(stickerUrl)
                     .setColor('#FF9900')
-                    .setFooter({ text: language === 'english' ? 'Please choose a different name.' : 'الرجاء اختيار اسم مختلف.' });
+                    .setFooter({ text: await t('Please choose a different name.', langCode) });
                 await interaction.reply({ embeds: [embed] });
                 return;
             }
@@ -491,18 +610,16 @@ client.on('interactionCreate', async interaction => {
                 const sticker = await interaction.guild.stickers.create({
                     file: emojiUrl,
                     name: stickerName,
-                    description: language === 'english' ? `Converted from emoji ID: ${emojiIdNum}` : `تم التحويل من إيموجي رقم: ${emojiIdNum}`,
+                    description: await t('Converted from emoji', langCode),
                     reason: `By ${interaction.user.tag}`
                 });
 
                 const embed = new EmbedBuilder()
-                    .setTitle(language === 'english' ? '✅ Sticker Created!' : '✅ تم إنشاء الملصق!')
-                    .setDescription(language === 'english' 
-                        ? `Successfully converted emoji to sticker!\n\n**Sticker Name:** ${stickerName}\n**Sticker ID:** ${sticker.id}`
-                        : `تم التحويل بنجاح من إيموجي إلى ملصق!\n\n**اسم الملصق:** ${stickerName}\n**معرف الملصق:** ${sticker.id}`)
+                    .setTitle('✅ ' + await t('Sticker Created!', langCode))
+                    .setDescription(await t('Successfully converted emoji to sticker!', langCode) + `\n\n**${await t('Sticker Name:', langCode)}** ${stickerName}\n**${await t('Sticker ID:', langCode)}** ${sticker.id}`)
                     .setImage(emojiUrl)
                     .setColor('#00FF00')
-                    .setFooter({ text: language === 'english' ? 'You can now use this sticker in your server!' : 'يمكنك الآن استخدام هذا الملصق في خادمك!' });
+                    .setFooter({ text: await t('You can now use this sticker in your server!', langCode) });
 
                 await interaction.reply({ embeds: [embed] });
                 convertedEmojisToStickers.set(trackingKey, {
@@ -512,10 +629,10 @@ client.on('interactionCreate', async interaction => {
                 });
             } catch (error) {
                 const errorMsg = error.code === 50045 ?
-                    (language === 'english' ? 'Emoji URL is invalid or unavailable' : 'رابط الإيموجي غير صالح أو غير متاح') :
+                    await t('Emoji URL is invalid or unavailable', langCode) :
                     error.code === 50138 ?
-                    (language === 'english' ? 'File must be under 512KB' : 'يجب أن يكون الملف أقل من 512 كيلوبايت') :
-                    (language === 'english' ? 'Error: ' : 'خطأ: ') + error.message;
+                    await t('File must be under 512KB', langCode) :
+                    await t('Error:', langCode) + ' ' + error.message;
                 const embed = new EmbedBuilder()
                     .setDescription(`❌ ${errorMsg}`)
                     .setColor('#FF0000');
@@ -526,7 +643,7 @@ client.on('interactionCreate', async interaction => {
 
         if (interaction.commandName === 'image_to_sticker') {
             if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageEmojisAndStickers)) {
-                const embed = new EmbedBuilder().setDescription(language === 'english' ? '❌ Need permission!' : '❌ تحتاج صلاحية!').setColor('#FF0000');
+                const embed = new EmbedBuilder().setDescription('❌ ' + await t('Need permission!', langCode)).setColor('#FF0000');
                 await interaction.reply({ embeds: [embed], ephemeral: true });
                 return;
             }
@@ -535,7 +652,7 @@ client.on('interactionCreate', async interaction => {
             const stickerName = interaction.options.getString('name');
 
             if (!isImageUrl(imageUrl)) {
-                const embed = new EmbedBuilder().setDescription(language === 'english' ? '❌ Invalid image URL!' : '❌ رابط صورة غير صالح!').setColor('#FF0000');
+                const embed = new EmbedBuilder().setDescription('❌ ' + await t('Invalid image URL!', langCode)).setColor('#FF0000');
                 await interaction.reply({ embeds: [embed] });
                 return;
             }
@@ -545,13 +662,11 @@ client.on('interactionCreate', async interaction => {
                 const stickerInfo = convertedImagesToStickers.get(imageTrackingKey);
                 const stickerUrl = `https://cdn.discordapp.com/stickers/${stickerInfo.stickerId}.png`;
                 const embed = new EmbedBuilder()
-                    .setTitle(language === 'english' ? '⚠️ Image Already Converted!' : '⚠️ تم تحويل هذه الصورة مسبقاً!')
-                    .setDescription(language === 'english' 
-                        ? `This image has already been converted to a sticker!\n\n**Existing Sticker Name:** ${stickerInfo.stickerName}\n**Sticker ID:** ${stickerInfo.stickerId}\n\nDelete the sticker to convert again.`
-                        : `تم تحويل هذه الصورة إلى ملصق مسبقاً!\n\n**اسم الملصق الموجود:** ${stickerInfo.stickerName}\n**معرف الملصق:** ${stickerInfo.stickerId}\n\nاحذف الملصق لتحويله مجدداً.`)
+                    .setTitle('⚠️ ' + await t('Image Already Converted!', langCode))
+                    .setDescription(await t('This image has already been converted to a sticker!', langCode) + `\n\n**${await t('Existing Sticker Name:', langCode)}** ${stickerInfo.stickerName}\n**${await t('Sticker ID:', langCode)}** ${stickerInfo.stickerId}\n\n${await t('Delete the sticker to convert again.', langCode)}`)
                     .setThumbnail(stickerUrl)
                     .setColor('#FF9900')
-                    .setFooter({ text: language === 'english' ? 'This conversion is already done.' : 'تم إجراء هذا التحويل بالفعل.' });
+                    .setFooter({ text: await t('This conversion is already done.', langCode) });
                 await interaction.reply({ embeds: [embed] });
                 return;
             }
@@ -562,13 +677,11 @@ client.on('interactionCreate', async interaction => {
             if (duplicateByName) {
                 const stickerUrl = `https://cdn.discordapp.com/stickers/${duplicateByName.id}.png`;
                 const embed = new EmbedBuilder()
-                    .setTitle(language === 'english' ? '⚠️ Sticker Name Already Exists!' : '⚠️ اسم الملصق موجود بالفعل!')
-                    .setDescription(language === 'english' 
-                        ? `A sticker with this name already exists!\n\n**Existing Sticker Name:** ${duplicateByName.name}\n**Sticker ID:** ${duplicateByName.id}`
-                        : `يوجد ملصق بهذا الاسم بالفعل!\n\n**اسم الملصق الموجود:** ${duplicateByName.name}\n**معرف الملصق:** ${duplicateByName.id}`)
+                    .setTitle('⚠️ ' + await t('Sticker Name Already Exists!', langCode))
+                    .setDescription(await t('A sticker with this name already exists!', langCode) + `\n\n**${await t('Existing Sticker Name:', langCode)}** ${duplicateByName.name}\n**${await t('Sticker ID:', langCode)}** ${duplicateByName.id}`)
                     .setThumbnail(stickerUrl)
                     .setColor('#FF9900')
-                    .setFooter({ text: language === 'english' ? 'Please choose a different name.' : 'الرجاء اختيار اسم مختلف.' });
+                    .setFooter({ text: await t('Please choose a different name.', langCode) });
                 await interaction.reply({ embeds: [embed] });
                 return;
             }
@@ -577,18 +690,16 @@ client.on('interactionCreate', async interaction => {
                 const sticker = await interaction.guild.stickers.create({
                     file: imageUrl,
                     name: stickerName,
-                    description: language === 'english' ? 'Converted from image' : 'تم التحويل من صورة',
+                    description: await t('Converted from image', langCode),
                     reason: `By ${interaction.user.tag}`
                 });
 
                 const embed = new EmbedBuilder()
-                    .setTitle(language === 'english' ? '✅ Sticker Created!' : '✅ تم إنشاء الملصق!')
-                    .setDescription(language === 'english' 
-                        ? `Successfully converted image to sticker!\n\n**Sticker Name:** ${stickerName}\n**Sticker ID:** ${sticker.id}`
-                        : `تم التحويل بنجاح من صورة إلى ملصق!\n\n**اسم الملصق:** ${stickerName}\n**معرف الملصق:** ${sticker.id}`)
+                    .setTitle('✅ ' + await t('Sticker Created!', langCode))
+                    .setDescription(await t('Successfully converted image to sticker!', langCode) + `\n\n**${await t('Sticker Name:', langCode)}** ${stickerName}\n**${await t('Sticker ID:', langCode)}** ${sticker.id}`)
                     .setImage(imageUrl)
                     .setColor('#00FF00')
-                    .setFooter({ text: language === 'english' ? 'You can now use this sticker in your server!' : 'يمكنك الآن استخدام هذا الملصق في خادمك!' });
+                    .setFooter({ text: await t('You can now use this sticker in your server!', langCode) });
 
                 await interaction.reply({ embeds: [embed] });
                 convertedImagesToStickers.set(imageTrackingKey, {
@@ -598,12 +709,12 @@ client.on('interactionCreate', async interaction => {
                 });
             } catch (error) {
                 const errorMsg = error.code === 50045 ?
-                    (language === 'english' ? 'Image URL is invalid or unavailable' : 'رابط الصورة غير صالح أو غير متاح') :
+                    await t('Image URL is invalid or unavailable', langCode) :
                     error.code === 50138 ?
-                    (language === 'english' ? 'File must be under 512KB' : 'يجب أن يكون الملف أقل من 512 كيلوبايت') :
+                    await t('File must be under 512KB', langCode) :
                     error.code === 50035 ?
-                    (language === 'english' ? 'Invalid request format' : 'صيغة الطلب غير صحيحة') :
-                    (language === 'english' ? 'Error: ' : 'خطأ: ') + error.message;
+                    await t('Invalid request format', langCode) :
+                    await t('Error:', langCode) + ' ' + error.message;
                 const embed = new EmbedBuilder()
                     .setDescription(`❌ ${errorMsg}`)
                     .setColor('#FF0000');
@@ -615,7 +726,7 @@ client.on('interactionCreate', async interaction => {
         if (interaction.commandName === 'list_emojis') {
             const emojis = Array.from(interaction.guild.emojis.cache.values());
             if (emojis.length === 0) {
-                const embed = new EmbedBuilder().setDescription(language === 'english' ? '❌ No emojis.' : '❌ لا توجد ايموجيات.').setColor('#FF0000');
+                const embed = new EmbedBuilder().setDescription('❌ ' + await t('No emojis.', langCode)).setColor('#FF0000');
                 await interaction.reply({ embeds: [embed], ephemeral: true });
                 return;
             }
@@ -627,12 +738,14 @@ client.on('interactionCreate', async interaction => {
             }
 
             let page = 0;
+            const pageText = await t('Page', langCode);
+            const emojisTitle = await t('Emojis', langCode);
             const embed = new EmbedBuilder()
                 .setAuthor({ name: interaction.guild.name, iconURL: interaction.guild.iconURL() })
-                .setTitle(`📋 ${language === 'english' ? 'Emojis' : 'الإيموجيات'}`)
+                .setTitle(`📋 ${emojisTitle}`)
                 .setColor('#00FFFF')
                 .setDescription(pages[page])
-                .setFooter({ text: `${language === 'english' ? 'Page' : 'صفحة'} ${page + 1}/${pages.length}`, iconURL: interaction.user.displayAvatarURL() });
+                .setFooter({ text: `${pageText} ${page + 1}/${pages.length}`, iconURL: interaction.user.displayAvatarURL() });
 
             const row = new ActionRowBuilder().addComponents(
                 new ButtonBuilder().setCustomId('prev').setLabel('◀️').setStyle(ButtonStyle.Primary).setDisabled(true),
@@ -641,6 +754,7 @@ client.on('interactionCreate', async interaction => {
 
             await interaction.reply({ embeds: [embed], components: [row], ephemeral: true });
 
+            const storedLangCode = langCode;
             const filter = i => (i.customId === 'next' || i.customId === 'prev') && i.user.id === interaction.user.id;
             const collector = interaction.channel.createMessageComponentCollector({ filter, time: 300000 });
 
@@ -648,12 +762,14 @@ client.on('interactionCreate', async interaction => {
                 if (i.customId === 'next') { page++; if (page >= pages.length) page = 0; }
                 else { page--; if (page < 0) page = pages.length - 1; }
 
+                const pageTextUpdate = await t('Page', storedLangCode);
+                const emojisTitleUpdate = await t('Emojis', storedLangCode);
                 const e = new EmbedBuilder()
                     .setAuthor({ name: interaction.guild.name, iconURL: interaction.guild.iconURL() })
-                    .setTitle(`📋 ${language === 'english' ? 'Emojis' : 'الإيموجيات'}`)
+                    .setTitle(`📋 ${emojisTitleUpdate}`)
                     .setColor('#00FFFF')
                     .setDescription(pages[page])
-                    .setFooter({ text: `${language === 'english' ? 'Page' : 'صفحة'} ${page + 1}/${pages.length}`, iconURL: interaction.user.displayAvatarURL() });
+                    .setFooter({ text: `${pageTextUpdate} ${page + 1}/${pages.length}`, iconURL: interaction.user.displayAvatarURL() });
 
                 const prevButton = new ButtonBuilder().setCustomId('prev').setLabel('◀️').setStyle(ButtonStyle.Primary).setDisabled(page === 0);
                 const nextButton = new ButtonBuilder().setCustomId('next').setLabel('▶️').setStyle(ButtonStyle.Primary).setDisabled(page === pages.length - 1);
@@ -665,52 +781,37 @@ client.on('interactionCreate', async interaction => {
 
         if (interaction.commandName === 'language') {
             if (!interaction.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
-                const embed = new EmbedBuilder().setDescription(language === 'english' ? '❌ Need ADMINISTRATOR!' : '❌ تحتاج صلاحية المسؤول!').setColor('#FF0000');
+                const embed = new EmbedBuilder().setDescription(await t('Need ADMINISTRATOR permission!', langCode)).setColor('#FF0000');
                 await interaction.reply({ embeds: [embed], ephemeral: true });
                 return;
             }
 
+            const currentLang = SUPPORTED_LANGUAGES[langCode] || SUPPORTED_LANGUAGES['en'];
             const embed = new EmbedBuilder()
-                .setTitle('🌐 Choose Language - اختر اللغة')
+                .setTitle('🌐 ' + await t('Choose Language', langCode))
                 .setColor('#00FFFF')
-                .setDescription('Choose your language:\nاختر لغتك:')
-                .addFields(
-                    { name: '🇺🇸 English', value: 'React with 🇺🇸', inline: true },
-                    { name: '<:Syria:1443915175379079208> العربية', value: 'تفاعل بـ <:Syria:1443915175379079208>', inline: true }
-                );
+                .setDescription(await t('Select your preferred language from the dropdown menu below:', langCode) + `\n\n**${await t('Current', langCode)}:** ${currentLang.flag} ${currentLang.native}`);
 
-            const msg = await interaction.reply({ embeds: [embed], fetchReply: true });
+            const options = Object.entries(SUPPORTED_LANGUAGES).map(([code, info]) => ({
+                label: `${info.name} - ${info.native}`,
+                description: info.name,
+                value: code,
+                emoji: info.flag.startsWith('<') ? { id: '1443915175379079208', name: 'Syria' } : info.flag,
+                default: code === langCode
+            }));
 
-            try {
-                await msg.react('🇺🇸');
-                await msg.react('<:Syria:1443915175379079208>');
-            } catch (error) {
-                console.error('⚠️ Warning: Could not add language reactions:', error.message);
-            }
+            const selectMenu = new StringSelectMenuBuilder()
+                .setCustomId('language_select')
+                .setPlaceholder(await t('Choose a language...', langCode))
+                .addOptions(options);
 
-            const filter = (reaction, user) =>
-                (reaction.emoji.name === '🇺🇸' ||
-                 reaction.emoji.id === '1443915175379079208') &&
-                user.id === interaction.user.id;
-
-            msg.awaitReactions({ filter, max: 1, time: 60000, errors: ['time'] })
-                .then(collected => {
-                    const reaction = collected.first();
-
-                    if (reaction.emoji.name === '🇺🇸') {
-                        serverLanguages.set(interaction.guild.id, 'english');
-                        interaction.followUp('✅ Language set to English!');
-                    } else {
-                        serverLanguages.set(interaction.guild.id, 'arabic');
-                        interaction.followUp('✅ تم تعيين اللغة إلى العربية!');
-                    }
-                })
-                .catch(() => interaction.followUp('⏳ Timeout.'));
+            const row = new ActionRowBuilder().addComponents(selectMenu);
+            await interaction.reply({ embeds: [embed], components: [row] });
         }
 
         if (interaction.commandName === 'delete_emoji') {
             if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageEmojisAndStickers)) {
-                const embed = new EmbedBuilder().setDescription(language === 'english' ? '❌ Need permission!' : '❌ تحتاج صلاحية!').setColor('#FF0000');
+                const embed = new EmbedBuilder().setDescription('❌ ' + await t('Need permission!', langCode)).setColor('#FF0000');
                 await interaction.reply({ embeds: [embed], ephemeral: true });
                 return;
             }
@@ -719,7 +820,7 @@ client.on('interactionCreate', async interaction => {
             const match = emojiInput.match(/<(a)?:\w+:(\d+)>/);
 
             if (!match) {
-                const embed = new EmbedBuilder().setDescription(language === 'english' ? '❌ Invalid emoji!' : '❌ ايموجي غير صالح!').setColor('#FF0000');
+                const embed = new EmbedBuilder().setDescription('❌ ' + await t('Invalid emoji!', langCode)).setColor('#FF0000');
                 await interaction.reply({ embeds: [embed] });
                 return;
             }
@@ -728,7 +829,7 @@ client.on('interactionCreate', async interaction => {
             const emj = interaction.guild.emojis.cache.get(emojiId);
 
             if (!emj) {
-                const embed = new EmbedBuilder().setDescription(language === 'english' ? `❌ ${emojiInput} not found!` : `❌ ${emojiInput} غير موجود!`).setColor('#FF0000');
+                const embed = new EmbedBuilder().setDescription('❌ ' + emojiInput + ' ' + await t('not found!', langCode)).setColor('#FF0000');
                 await interaction.reply({ embeds: [embed] });
                 return;
             }
@@ -740,12 +841,12 @@ client.on('interactionCreate', async interaction => {
                         convertedStickersToEmojis.delete(key);
                     }
                 });
-                const embed = new EmbedBuilder().setDescription(language === 'english' ? `✅ Emoji deleted!` : `✅ تم حذف الايموجي!`).setColor('#00FF00');
+                const embed = new EmbedBuilder().setDescription('✅ ' + await t('Emoji deleted!', langCode)).setColor('#00FF00');
                 await interaction.reply({ embeds: [embed] });
             } catch (error) {
                 const errorMsg = error.code === 50013 ?
-                    (language === 'english' ? 'Missing permissions to delete emoji' : 'لا توجد صلاحيات لحذف الإيموجي') :
-                    (language === 'english' ? 'Error: ' : 'خطأ: ') + error.message;
+                    await t('Missing permissions to delete emoji', langCode) :
+                    await t('Error:', langCode) + ' ' + error.message;
                 const embed = new EmbedBuilder().setDescription(`❌ ${errorMsg}`).setColor('#FF0000');
                 await interaction.reply({ embeds: [embed] });
                 console.error(`⚠️ Discord Error in delete_emoji:`, error.code, error.message);
@@ -754,7 +855,7 @@ client.on('interactionCreate', async interaction => {
 
         if (interaction.commandName === 'rename_emoji') {
             if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageEmojisAndStickers)) {
-                const embed = new EmbedBuilder().setDescription(language === 'english' ? '❌ Need permission!' : '❌ تحتاج صلاحية!').setColor('#FF0000');
+                const embed = new EmbedBuilder().setDescription('❌ ' + await t('Need permission!', langCode)).setColor('#FF0000');
                 await interaction.reply({ embeds: [embed], ephemeral: true });
                 return;
             }
@@ -764,7 +865,7 @@ client.on('interactionCreate', async interaction => {
             const match = emojiInput.match(/<(a)?:\w+:(\d+)>/);
 
             if (!match) {
-                const embed = new EmbedBuilder().setDescription(language === 'english' ? '❌ Invalid emoji!' : '❌ ايموجي غير صالح!').setColor('#FF0000');
+                const embed = new EmbedBuilder().setDescription('❌ ' + await t('Invalid emoji!', langCode)).setColor('#FF0000');
                 await interaction.reply({ embeds: [embed] });
                 return;
             }
@@ -773,21 +874,21 @@ client.on('interactionCreate', async interaction => {
             const emj = interaction.guild.emojis.cache.get(emojiId);
 
             if (!emj) {
-                const embed = new EmbedBuilder().setDescription(language === 'english' ? `❌ ${emojiInput} not found!` : `❌ ${emojiInput} غير موجود!`).setColor('#FF0000');
+                const embed = new EmbedBuilder().setDescription('❌ ' + emojiInput + ' ' + await t('not found!', langCode)).setColor('#FF0000');
                 await interaction.reply({ embeds: [embed] });
                 return;
             }
 
             try {
                 await emj.edit({ name: newName });
-                const embed = new EmbedBuilder().setDescription(language === 'english' ? `✅ Renamed to ${newName}! ${emj}` : `✅ تم التغيير إلى ${newName}! ${emj}`).setColor('#00FF00');
+                const embed = new EmbedBuilder().setDescription('✅ ' + await t('Renamed to', langCode) + ' ' + newName + '! ' + emj).setColor('#00FF00');
                 await interaction.reply({ embeds: [embed] });
             } catch (error) {
                 const errorMsg = error.code === 50013 ?
-                    (language === 'english' ? 'Missing permissions to rename emoji' : 'لا توجد صلاحيات لإعادة تسمية الإيموجي') :
+                    await t('Missing permissions to rename emoji', langCode) :
                     error.code === 50035 ?
-                    (language === 'english' ? 'Invalid emoji name' : 'اسم الإيموجي غير صالح') :
-                    (language === 'english' ? 'Error: ' : 'خطأ: ') + error.message;
+                    await t('Invalid emoji name', langCode) :
+                    await t('Error:', langCode) + ' ' + error.message;
                 const embed = new EmbedBuilder().setDescription(`❌ ${errorMsg}`).setColor('#FF0000');
                 await interaction.reply({ embeds: [embed] });
                 console.error(`⚠️ Discord Error in rename_emoji:`, error.code, error.message);
@@ -796,25 +897,23 @@ client.on('interactionCreate', async interaction => {
 
         if (interaction.commandName === 'delete_sticker') {
             if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageEmojisAndStickers)) {
-                const embed = new EmbedBuilder().setDescription(language === 'english' ? '❌ Need permission!' : '❌ تحتاج صلاحية!').setColor('#FF0000');
+                const embed = new EmbedBuilder().setDescription('❌ ' + await t('Need permission!', langCode)).setColor('#FF0000');
                 await interaction.reply({ embeds: [embed], ephemeral: true });
                 return;
             }
 
             const embed = new EmbedBuilder()
-                .setTitle(language === 'english' ? '📌 Send or Reply with Sticker' : '📌 أرسل أو رد باستخدام ملصق')
-                .setDescription(language === 'english' 
-                    ? 'Reply to this message using the sticker you want to delete, and I will delete it for you.'
-                    : 'رد على هذه الرسالة باستخدام الملصق الذي تريد حذفه، وسأحذفه لك.')
+                .setTitle('📌 ' + await t('Send or Reply with Sticker', langCode))
+                .setDescription(await t('Reply to this message using the sticker you want to delete, and I will delete it for you.', langCode))
                 .setColor('#FF9900')
-                .setFooter({ text: language === 'english' ? 'Waiting for your sticker...' : 'في انتظار ملصقك...' });
+                .setFooter({ text: await t('Waiting for your sticker...', langCode) });
 
             const msg = await interaction.reply({ embeds: [embed], fetchReply: true });
             
             stickerDeletionSessions.set(msg.id, {
                 guildId: interaction.guild.id,
                 userId: interaction.user.id,
-                language: language,
+                langCode: langCode,
                 messageId: msg.id,
                 channelId: msg.channel.id
             });
@@ -828,7 +927,7 @@ client.on('interactionCreate', async interaction => {
 
         if (interaction.commandName === 'sticker_to_emoji') {
             if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageEmojisAndStickers)) {
-                const embed = new EmbedBuilder().setDescription(language === 'english' ? '❌ Need permission!' : '❌ تحتاج صلاحية!').setColor('#FF0000');
+                const embed = new EmbedBuilder().setDescription('❌ ' + await t('Need permission!', langCode)).setColor('#FF0000');
                 await interaction.reply({ embeds: [embed], ephemeral: true });
                 return;
             }
@@ -836,19 +935,17 @@ client.on('interactionCreate', async interaction => {
             const emojiName = interaction.options.getString('name');
 
             const embed = new EmbedBuilder()
-                .setTitle(language === 'english' ? '📌 Reply with Sticker' : '📌 رد باستخدام ملصق')
-                .setDescription(language === 'english' 
-                    ? `Reply to this message using the sticker you want to convert to an emoji.\n\n**Emoji Name:** ${emojiName}`
-                    : `رد على هذه الرسالة باستخدام الملصق الذي تريد تحويله إلى إيموجي.\n\n**اسم الإيموجي:** ${emojiName}`)
+                .setTitle('📌 ' + await t('Reply with Sticker', langCode))
+                .setDescription(await t('Reply to this message using the sticker you want to convert to an emoji.', langCode) + `\n\n**${await t('Emoji Name:', langCode)}** ${emojiName}`)
                 .setColor('#00FFFF')
-                .setFooter({ text: language === 'english' ? 'Waiting for your sticker...' : 'في انتظار ملصقك...' });
+                .setFooter({ text: await t('Waiting for your sticker...', langCode) });
 
             const msg = await interaction.reply({ embeds: [embed], fetchReply: true });
             
             stickerToEmojiSessions.set(msg.id, {
                 guildId: interaction.guild.id,
                 userId: interaction.user.id,
-                language: language,
+                langCode: langCode,
                 messageId: msg.id,
                 channelId: msg.channel.id,
                 emojiName: emojiName
@@ -867,17 +964,16 @@ client.on('interactionCreate', async interaction => {
 
 client.on('messageCreate', async message => {
     if (message.author.bot || !message.guild) return;
-    const language = serverLanguages.get(message.guild.id) || 'english';
+    const langCode = serverLanguages.get(message.guild.id) || 'en';
 
-    // Handle sticker deletion and conversion replies
     if (message.reference && message.stickers && message.stickers.size > 0) {
         try {
             const repliedTo = await message.channel.messages.fetch(message.reference.messageId);
             const deletionSession = stickerDeletionSessions.get(repliedTo.id);
             const conversionSession = stickerToEmojiSessions.get(repliedTo.id);
             
-            // Handle sticker deletion
             if (deletionSession && deletionSession.userId === message.author.id && deletionSession.guildId === message.guild.id) {
+                const sessionLang = deletionSession.langCode || 'en';
                 const sticker = message.stickers.first();
                 const serverStickers = message.guild.stickers.cache;
                 const stickerToDelete = serverStickers.find(s => s.id === sticker.id);
@@ -901,18 +997,16 @@ client.on('messageCreate', async message => {
                             }
                         });
                         const embed = new EmbedBuilder()
-                            .setTitle(language === 'english' ? '✅ Sticker Deleted!' : '✅ تم حذف الملصق!')
-                            .setDescription(language === 'english' 
-                                ? `Successfully deleted sticker: **${stickerToDelete.name}**\n\nYou can now convert the source emoji/image again.`
-                                : `تم حذف الملصق بنجاح: **${stickerToDelete.name}**\n\nيمكنك الآن تحويل الإيموجي/الصورة مجدداً.`)
+                            .setTitle('✅ ' + await t('Sticker Deleted!', sessionLang))
+                            .setDescription(await t('Successfully deleted sticker:', sessionLang) + ` **${stickerToDelete.name}**\n\n${await t('You can now convert the source emoji/image again.', sessionLang)}`)
                             .setColor('#00FF00')
-                            .setFooter({ text: language === 'english' ? 'Sticker removed from server.' : 'تم إزالة الملصق من الخادم.' });
+                            .setFooter({ text: await t('Sticker removed from server.', sessionLang) });
                         await message.reply({ embeds: [embed] });
                         stickerDeletionSessions.delete(repliedTo.id);
                     } catch (error) {
                         const errorMsg = error.code === 50013 ?
-                            (language === 'english' ? 'Missing permissions to delete sticker' : 'لا توجد صلاحيات لحذف الملصق') :
-                            (language === 'english' ? 'Error: ' : 'خطأ: ') + error.message;
+                            await t('Missing permissions to delete sticker', sessionLang) :
+                            await t('Error:', sessionLang) + ' ' + error.message;
                         const embed = new EmbedBuilder()
                             .setDescription(`❌ ${errorMsg}`)
                             .setColor('#FF0000');
@@ -921,16 +1015,14 @@ client.on('messageCreate', async message => {
                     }
                 } else {
                     const embed = new EmbedBuilder()
-                        .setDescription(language === 'english' 
-                            ? '❌ Sticker not found in this server!'
-                            : '❌ الملصق غير موجود في هذا الخادم!')
+                        .setDescription('❌ ' + await t('Sticker not found in this server!', sessionLang))
                         .setColor('#FF0000');
                     await message.reply({ embeds: [embed] });
                 }
             }
             
-            // Handle sticker to emoji conversion
             if (conversionSession && conversionSession.userId === message.author.id && conversionSession.guildId === message.guild.id) {
+                const sessionLang = conversionSession.langCode || 'en';
                 const sticker = message.stickers.first();
                 const emojiName = conversionSession.emojiName;
                 const stickerUrl = sticker.url;
@@ -939,12 +1031,10 @@ client.on('messageCreate', async message => {
                 if (convertedStickersToEmojis.has(stickerTrackingKey)) {
                     const emojiInfo = convertedStickersToEmojis.get(stickerTrackingKey);
                     const embed = new EmbedBuilder()
-                        .setTitle(language === 'english' ? '⚠️ Sticker Already Converted!' : '⚠️ تم تحويل هذا الملصق مسبقاً!')
-                        .setDescription(language === 'english' 
-                            ? `This sticker has already been converted to an emoji!\n\n**Existing Emoji Name:** ${emojiInfo.emojiName}\n\nDelete the emoji to convert again.`
-                            : `تم تحويل هذا الملصق إلى إيموجي مسبقاً!\n\n**اسم الإيموجي الموجود:** ${emojiInfo.emojiName}\n\nاحذف الإيموجي لتحويله مجدداً.`)
+                        .setTitle('⚠️ ' + await t('Sticker Already Converted!', sessionLang))
+                        .setDescription(await t('This sticker has already been converted to an emoji!', sessionLang) + `\n\n**${await t('Existing Emoji Name:', sessionLang)}** ${emojiInfo.emojiName}\n\n${await t('Delete the emoji to convert again.', sessionLang)}`)
                         .setColor('#FF9900')
-                        .setFooter({ text: language === 'english' ? 'This conversion is already done.' : 'تم إجراء هذا التحويل بالفعل.' });
+                        .setFooter({ text: await t('This conversion is already done.', sessionLang) });
                     await message.reply({ embeds: [embed] });
                     stickerToEmojiSessions.delete(repliedTo.id);
                     return;
@@ -953,13 +1043,11 @@ client.on('messageCreate', async message => {
                 try {
                     const emoji = await message.guild.emojis.create({ attachment: stickerUrl, name: emojiName });
                     const embed = new EmbedBuilder()
-                        .setTitle(language === 'english' ? '✅ Emoji Created!' : '✅ تم إنشاء الإيموجي!')
-                        .setDescription(language === 'english' 
-                            ? `Successfully converted sticker to emoji!\n\n**Emoji Name:** ${emojiName}\n**Source Sticker:** ${sticker.name}`
-                            : `تم التحويل بنجاح من ملصق إلى إيموجي!\n\n**اسم الإيموجي:** ${emojiName}\n**الملصق الأصلي:** ${sticker.name}`)
+                        .setTitle('✅ ' + await t('Emoji Created!', sessionLang))
+                        .setDescription(await t('Successfully converted sticker to emoji!', sessionLang) + `\n\n**${await t('Emoji Name:', sessionLang)}** ${emojiName}\n**${await t('Source Sticker:', sessionLang)}** ${sticker.name}`)
                         .setImage(stickerUrl)
                         .setColor('#00FF00')
-                        .setFooter({ text: language === 'english' ? 'You can now use this emoji in your server!' : 'يمكنك الآن استخدام هذا الإيموجي في خادمك!' });
+                        .setFooter({ text: await t('You can now use this emoji in your server!', sessionLang) });
                     await message.reply({ embeds: [embed] });
                     stickerToEmojiSessions.delete(repliedTo.id);
                     convertedStickersToEmojis.set(stickerTrackingKey, {
@@ -969,10 +1057,10 @@ client.on('messageCreate', async message => {
                     });
                 } catch (error) {
                     const errorMsg = error.code === 50138 ?
-                        (language === 'english' ? 'Sticker must be under 256KB' : 'يجب أن يكون الملصق أقل من 256 كيلوبايت') :
+                        await t('Sticker must be under 256KB', sessionLang) :
                         error.code === 50013 ?
-                        (language === 'english' ? 'Missing permissions to create emoji' : 'لا توجد صلاحيات لإنشاء إيموجي') :
-                        (language === 'english' ? 'Error: ' : 'خطأ: ') + error.message;
+                        await t('Missing permissions to create emoji', sessionLang) :
+                        await t('Error:', sessionLang) + ' ' + error.message;
                     const embed = new EmbedBuilder()
                         .setDescription(`❌ ${errorMsg}`)
                         .setColor('#FF0000');
@@ -986,96 +1074,56 @@ client.on('messageCreate', async message => {
     }
 
     if (message.content.startsWith(prefix + 'help')) {
-        message.channel.send(language === 'english' ? '**Check your DM**' : '**شوف خاصك**').then(m => setTimeout(() => m.delete(), 5000));
+        const checkDM = await t('Check your DM', langCode);
+        message.channel.send(`**${checkDM}**`).then(m => setTimeout(() => m.delete(), 5000));
+
+        const helpContent = `**${await t('Welcome, this is my help menu', langCode)}**
+⌄ـــــــــــــــــــــــــــProEmojiـــــــــــــــــــــــــــــ⌄
+
+${await t('The prefix of the bot is', langCode)} **[ + ]**
+
+⌄ـــــــــــــــــــــــــــProEmojiـــــــــــــــــــــــــــــ⌄
+
+${await t('If you do not have Nitro you can write this command', langCode)} **+suggestemojis** ${await t('so that the bot will suggest emojis to you from different servers', langCode)}
+
+⌄ـــــــــــــــــــــــــــProEmojiـــــــــــــــــــــــــــــ⌄
+
+${await t('You can use this slash command', langCode)} **/image_to_emoji** ${await t('to convert an image URL into an emoji and save it on your server', langCode)}
+
+⌄ـــــــــــــــــــــــــــProEmojiـــــــــــــــــــــــــــــ⌄
+
+${await t('You can add an emoji using this command', langCode)} **+addemoji** ${await t('and you will be able to add an emoji with its original name', langCode)}
+
+⌄ـــــــــــــــــــــــــــProEmojiـــــــــــــــــــــــــــــ⌄
+
+${await t('You can add an emoji and change its name using this Slash Command', langCode)} **/addemoji**
+
+⌄ـــــــــــــــــــــــــــProEmojiـــــــــــــــــــــــــــــ⌄
+
+${await t('If you want to rename an emoji you can use this slash command', langCode)} **/rename_emoji** ${await t('and the emoji name will be changed', langCode)}
+
+⌄ـــــــــــــــــــــــــــProEmojiـــــــــــــــــــــــــــــ⌄
+
+${await t('You can convert an emoji to a sticker using this slash command', langCode)} **/emoji_to_sticker** ${await t('and the emoji will be turned into a beautiful sticker!', langCode)}
+
+⌄ـــــــــــــــــــــــــــProEmojiـــــــــــــــــــــــــــــ⌄
+
+${await t('You can convert an image to a sticker using this slash command', langCode)} **/image_to_sticker** ${await t('and the image will be turned into a beautiful sticker!', langCode)}
+
+⌄ـــــــــــــــــــــــــــProEmojiـــــــــــــــــــــــــــــ⌄
+
+${await t('You can delete a sticker using this slash command', langCode)} **/delete_sticker** ${await t('and then reply with the sticker you want to delete!', langCode)}
+
+⌄ـــــــــــــــــــــــــــProEmojiـــــــــــــــــــــــــــــ⌄
+
+${await t('You can convert a sticker to an emoji using this slash command', langCode)} **/sticker_to_emoji** ${await t('and then reply with the sticker you want to convert!', langCode)}`;
 
         const embed = new EmbedBuilder()
-            .setTitle(language === 'english' ? '📖 ProEmoji Help' : '📖 مساعدة ProEmoji')
-            .setDescription(
-                language === 'english'
-                    ? `**Welcome, this is my help menu**
-⌄ـــــــــــــــــــــــــــProEmojiـــــــــــــــــــــــــــــ⌄
-
-The prefix of the bot is **[ + ]**
-
-⌄ـــــــــــــــــــــــــــProEmojiـــــــــــــــــــــــــــــ⌄
-
-If you do not have Nitro you can write this command **+suggestemojis** so that the bot will suggest emojis to you from different servers
-
-⌄ـــــــــــــــــــــــــــProEmojiـــــــــــــــــــــــــــــ⌄
-
-You can use this slash command **/image_to_emoji** to convert an image URL into an emoji and save it on your server
-
-⌄ـــــــــــــــــــــــــــProEmojiـــــــــــــــــــــــــــــ⌄
-
-You can add an emoji using this command **+addemoji** and you will be able to add an emoji with its original name
-
-⌄ـــــــــــــــــــــــــــProEmojiـــــــــــــــــــــــــــــ⌄
-
-You can add an emoji and change its name using this Slash Command **/addemoji**
-
-⌄ـــــــــــــــــــــــــــProEmojiـــــــــــــــــــــــــــــ⌄
-
-If you want to rename an emoji you can use this slash command **/rename_emoji** and the emoji name will be changed
-
-⌄ـــــــــــــــــــــــــــProEmojiـــــــــــــــــــــــــــــ⌄
-
-You can convert an emoji to a sticker using this slash command **/emoji_to_sticker** and the emoji will be turned into a beautiful sticker!
-
-⌄ـــــــــــــــــــــــــــProEmojiـــــــــــــــــــــــــــــ⌄
-
-You can convert an image to a sticker using this slash command **/image_to_sticker** and the image will be turned into a beautiful sticker!
-
-⌄ـــــــــــــــــــــــــــProEmojiـــــــــــــــــــــــــــــ⌄
-
-You can delete a sticker using this slash command **/delete_sticker** and then reply with the sticker you want to delete!
-
-⌄ـــــــــــــــــــــــــــProEmojiـــــــــــــــــــــــــــــ⌄
-
-You can convert a sticker to an emoji using this slash command **/sticker_to_emoji** and then reply with the sticker you want to convert!`
-                    : `**أهلا بك هذا قائمة المساعدة الخاصة بي**
-⌄ـــــــــــــــــــــــــــProEmojiـــــــــــــــــــــــــــــ⌄
-
-بادئة البوت هي **[ + ]**
-
-⌄ـــــــــــــــــــــــــــProEmojiـــــــــــــــــــــــــــــ⌄
-
-إذا لم تكن لديك Nitro يمكنك كتابة هذا الأمر **+suggestemojis** حتى يقترح عليك البوت الإيموجيات من خوادم مختلفة
-
-⌄ـــــــــــــــــــــــــــProEmojiـــــــــــــــــــــــــــــ⌄
-
-يمكنك استخدام أمر الشرطة المائلة **/image_to_emoji** لتحويل رابط صورة إلى إيموجي وحفظه على خادمك
-
-⌄ـــــــــــــــــــــــــــProEmojiـــــــــــــــــــــــــــــ⌄
-
-يمكنك إضافة إيموجي باستخدام هذا الأمر **+addemoji** وستتمكن من إضافة إيموجي باسمه الأصلي
-
-⌄ـــــــــــــــــــــــــــProEmojiـــــــــــــــــــــــــــــ⌄
-
-يمكنك إضافة إيموجي وتغيير اسمه باستخدام أمر الشرطة المائلة **/addemoji**
-
-⌄ـــــــــــــــــــــــــــProEmojiـــــــــــــــــــــــــــــ⌄
-
-إذا كنت تريد إعادة تسمية إيموجي يمكنك استخدام أمر الشرطة المائلة **/rename_emoji** وسيتم تغيير اسم الإيموجي
-
-⌄ـــــــــــــــــــــــــــProEmojiـــــــــــــــــــــــــــــ⌄
-
-يمكنك تحويل إيموجي إلى ملصق باستخدام أمر الشرطة المائلة **/emoji_to_sticker** وسيتم تحويل الإيموجي إلى ملصق جميل!
-
-⌄ـــــــــــــــــــــــــــProEmojiـــــــــــــــــــــــــــــ⌄
-
-يمكنك تحويل صورة إلى ملصق باستخدام أمر الشرطة المائلة **/image_to_sticker** وسيتم تحويل الصورة إلى ملصق جميل!
-
-⌄ـــــــــــــــــــــــــــProEmojiـــــــــــــــــــــــــــــ⌄
-
-يمكنك حذف ملصق باستخدام أمر الشرطة المائلة **/delete_sticker** ثم رد برسالة تحتوي على الملصق الذي تريد حذفه!
-
-⌄ـــــــــــــــــــــــــــProEmojiـــــــــــــــــــــــــــــ⌄
-
-يمكنك تحويل ملصق إلى إيموجي باستخدام أمر الشرطة المائلة **/sticker_to_emoji** ثم رد برسالة تحتوي على الملصق الذي تريد تحويله!`
-            )
+            .setTitle('📖 ' + await t('ProEmoji Help', langCode))
+            .setDescription(helpContent)
             .setColor('#0099ff');
 
-        await message.author.send({ embeds: [embed] }).catch(() => message.reply(language === 'english' ? '❌ Could not send DM!' : '❌ لم أستطع إرسال رسالة خاصة!'));
+        await message.author.send({ embeds: [embed] }).catch(async () => message.reply('❌ ' + await t('Could not send DM!', langCode)));
     }
 
     if (message.content === 'نعم' || message.content.toLowerCase() === 'yes') {
@@ -1089,16 +1137,12 @@ You can convert a sticker to an emoji using this slash command **/sticker_to_emo
                     }
                 }
             }
-            message.channel.send(language === 'english' 
-                ? '✅ The suggested emojis have been added successfully!' 
-                : '✅ تمت إضافة الايموجيات المقترحة بنجاح!');
+            message.channel.send('✅ ' + await t('The suggested emojis have been added successfully!', langCode));
             suggestedEmojis = [];
         }
     } else if (message.content === 'لا' || message.content.toLowerCase() === 'no') {
         if (suggestedEmojis.length > 0) {
-            message.channel.send(language === 'english' 
-                ? '❌ The suggested emojis were not added.' 
-                : '❌ لم يتم إضافة الايموجيات المقترحة.');
+            message.channel.send('❌ ' + await t('The suggested emojis were not added.', langCode));
             suggestedEmojis = [];
         }
     }
