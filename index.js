@@ -41,18 +41,18 @@ const LANGUAGES_FILE = 'languages.json';
 const translationCache = new Map();
 
 const SUPPORTED_LANGUAGES = {
-    'en': { name: 'English', flag: '🇺🇸', native: 'English' },
-    'ar': { name: 'Arabic', flag: '<:Syria:1443915175379079208>', native: 'العربية' },
-    'zh': { name: 'Chinese', flag: '🇨🇳', native: '中文' },
-    'es': { name: 'Spanish', flag: '🇪🇸', native: 'Español' },
-    'ru': { name: 'Russian', flag: '🇷🇺', native: 'Русский' },
-    'tr': { name: 'Turkish', flag: '🇹🇷', native: 'Türkçe' },
-    'fr': { name: 'French', flag: '🇫🇷', native: 'Français' },
-    'de': { name: 'German', flag: '🇩🇪', native: 'Deutsch' },
-    'it': { name: 'Italian', flag: '🇮🇹', native: 'Italiano' },
-    'ja': { name: 'Japanese', flag: '🇯🇵', native: '日本語' },
-    'ko': { name: 'Korean', flag: '🇰🇷', native: '한국어' },
-    'pt': { name: 'Portuguese', flag: '🇧🇷', native: 'Português' }
+    'en': { name: 'English', flag: '🇺🇸', native: 'English', translateCode: 'en' },
+    'ar': { name: 'Arabic', flag: '<:Syria:1443915175379079208>', native: 'العربية', translateCode: 'ar' },
+    'zh': { name: 'Chinese', flag: '🇨🇳', native: '中文', translateCode: 'zh-CN' },
+    'es': { name: 'Spanish', flag: '🇪🇸', native: 'Español', translateCode: 'es' },
+    'ru': { name: 'Russian', flag: '🇷🇺', native: 'Русский', translateCode: 'ru' },
+    'tr': { name: 'Turkish', flag: '🇹🇷', native: 'Türkçe', translateCode: 'tr' },
+    'fr': { name: 'French', flag: '🇫🇷', native: 'Français', translateCode: 'fr' },
+    'de': { name: 'German', flag: '🇩🇪', native: 'Deutsch', translateCode: 'de' },
+    'it': { name: 'Italian', flag: '🇮🇹', native: 'Italiano', translateCode: 'it' },
+    'ja': { name: 'Japanese', flag: '🇯🇵', native: '日本語', translateCode: 'ja' },
+    'ko': { name: 'Korean', flag: '🇰🇷', native: '한국어', translateCode: 'ko' },
+    'pt': { name: 'Portuguese', flag: '🇧🇷', native: 'Português', translateCode: 'pt' }
 };
 
 function readLanguagesFile() {
@@ -127,12 +127,21 @@ async function t(text, langCode) {
     }
     
     try {
-        const result = await translate(text, { from: 'en', to: langCode });
+        const translateCode = SUPPORTED_LANGUAGES[langCode]?.translateCode || langCode;
+        const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Translation timeout')), 5000)
+        );
+        
+        const result = await Promise.race([
+            translate(text, { from: 'en', to: translateCode }),
+            timeoutPromise
+        ]);
+        
         const translated = result.text;
         translationCache.set(cacheKey, translated);
         
-        if (translationCache.size > 5000) {
-            const keysToDelete = Array.from(translationCache.keys()).slice(0, 1000);
+        if (translationCache.size > 10000) {
+            const keysToDelete = Array.from(translationCache.keys()).slice(0, 2000);
             keysToDelete.forEach(key => translationCache.delete(key));
         }
         
@@ -147,28 +156,19 @@ loadServerLanguages();
 
 async function preWarmCache() {
     const commonMessages = [
-        'Language Updated!', 'Permission Settings', 'Allow bot to suggest emojis from this server?',
-        'Permission Granted', 'Bot can suggest emojis from this server.', 'Permission Denied',
-        'Bot will NOT suggest emojis.', 'Need ADMINISTRATOR permission!', 'Allow', 'Refuse',
-        'No Emojis Available', 'No emojis available.', 'Suggested Emojis', 'Here are 5 suggestions:',
-        'React with checkmark to add or X to cancel.', 'Emojis added!', 'Cancelled.', 'Timeout.',
-        'Added!', 'Invalid emoji!', 'already exists!', 'Error:', 'Image converted to emoji!',
-        'Image must be under 256KB', 'Invalid request:', 'Invalid image URL!', 'Image already used!',
-        'Need permission!', 'Emoji Already Converted!', 'This emoji has already been converted to a sticker!',
-        'Existing Sticker Name:', 'Sticker ID:', 'Delete the sticker to convert again.',
-        'Sticker Converted!', 'Sticker converted to emoji!', 'Sticker deleted!', 'Sticker not found!',
-        'Emojis Listed:', 'No emojis in this server', 'Emoji deleted!', 'Emoji renamed!',
-        'Need Manage Emojis permission!', 'Pong!', 'Response time:'
+        'Pong!', 'Gateway latency:', 'Response time:', 'Permission Settings', 'Allow', 'Refuse'
     ];
     
-    for (const lang of Object.keys(SUPPORTED_LANGUAGES)) {
-        if (lang !== 'en') {
-            for (const msg of commonMessages.slice(0, 10)) {
-                await t(msg, lang).catch(() => {});
+    setImmediate(async () => {
+        for (const lang of Object.keys(SUPPORTED_LANGUAGES)) {
+            if (lang !== 'en') {
+                for (const msg of commonMessages) {
+                    t(msg, lang).catch(() => {});
+                }
             }
         }
-    }
-    console.log('✅ Cache pre-warmed');
+        console.log('✅ Cache pre-warming in progress (non-blocking)');
+    });
 }
 
 function parseEmoji(emoji) {
@@ -367,7 +367,7 @@ client.once('ready', async () => {
         console.log('✅ Slash commands registered!');
         console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
         
-        preWarmCache();
+        preWarmCache().catch(err => console.error('⚠️ Cache warming error:', err.message));
     } catch (error) {
         console.error('❌ Error:', error);
     }
@@ -412,10 +412,15 @@ client.on('interactionCreate', async interaction => {
 
     try {
         if (interaction.commandName === 'ping') {
-            const latency = Math.round(client.ws.ping);
+            const startTime = Date.now();
+            const gatewayLatency = Math.round(client.ws.ping);
+            
             const embed = new EmbedBuilder()
                 .setTitle('🏓 ' + await t('Pong!', langCode))
-                .setDescription(await t('Response time:', langCode) + ' ' + latency + 'ms')
+                .setDescription(
+                    await t('Gateway latency:', langCode) + ' ' + gatewayLatency + 'ms\n' +
+                    await t('Response time:', langCode) + ' ' + (Date.now() - startTime) + 'ms'
+                )
                 .setColor('#00FFFF');
             await interaction.reply({ embeds: [embed] });
             return;
