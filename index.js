@@ -119,6 +119,24 @@ client.once('ready', async () => {
                 ]
             },
             {
+                name: 'emoji_to_sticker',
+                description: 'Convert emoji to sticker',
+                options: [
+                    {
+                        name: 'emoji',
+                        type: ApplicationCommandOptionType.String,
+                        description: 'The emoji to convert',
+                        required: true
+                    },
+                    {
+                        name: 'name',
+                        type: ApplicationCommandOptionType.String,
+                        description: 'Sticker name',
+                        required: true
+                    }
+                ]
+            },
+            {
                 name: 'list_emojis',
                 description: 'List all server emojis'
             },
@@ -348,6 +366,54 @@ client.on('interactionCreate', async interaction => {
             }
         }
 
+        if (interaction.commandName === 'emoji_to_sticker') {
+            if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageEmojisAndStickers)) {
+                const embed = new EmbedBuilder().setDescription(language === 'english' ? '❌ Need permission!' : '❌ تحتاج صلاحية!').setColor('#FF0000');
+                await interaction.reply({ embeds: [embed], ephemeral: true });
+                return;
+            }
+
+            const emojiInput = interaction.options.getString('emoji');
+            const stickerName = interaction.options.getString('name');
+            const match = emojiInput.match(/<(a)?:(\w+):(\d+)>/);
+
+            if (!match) {
+                const embed = new EmbedBuilder().setDescription(language === 'english' ? '❌ Invalid emoji!' : '❌ ايموجي غير صالح!').setColor('#FF0000');
+                await interaction.reply({ embeds: [embed] });
+                return;
+            }
+
+            try {
+                const emojiId = match[2];
+                const isAnimated = !!match[1];
+                const fileExtension = isAnimated ? '.gif' : '.png';
+                const emojiUrl = `https://cdn.discordapp.com/emojis/${match[3] + fileExtension}`;
+
+                const sticker = await interaction.guild.stickers.create({
+                    file: emojiUrl,
+                    name: stickerName,
+                    description: language === 'english' ? `Converted from emoji: ${emojiInput}` : `تم التحويل من إيموجي: ${emojiInput}`,
+                    reason: `By ${interaction.user.tag}`
+                });
+
+                const embed = new EmbedBuilder()
+                    .setTitle(language === 'english' ? '✅ Sticker Created!' : '✅ تم إنشاء الملصق!')
+                    .setDescription(language === 'english' 
+                        ? `Successfully converted emoji to sticker!\n\n**Sticker Name:** ${stickerName}\n**Sticker ID:** ${sticker.id}`
+                        : `تم التحويل بنجاح من إيموجي إلى ملصق!\n\n**اسم الملصق:** ${stickerName}\n**معرف الملصق:** ${sticker.id}`)
+                    .setImage(emojiUrl)
+                    .setColor('#00FF00')
+                    .setFooter({ text: language === 'english' ? 'You can now use this sticker in your server!' : 'يمكنك الآن استخدام هذا الملصق في خادمك!' });
+
+                await interaction.reply({ embeds: [embed] });
+            } catch (error) {
+                const embed = new EmbedBuilder()
+                    .setDescription(`❌ Error: ${error.message}`)
+                    .setColor('#FF0000');
+                await interaction.reply({ embeds: [embed] });
+            }
+        }
+
         if (interaction.commandName === 'list_emojis') {
             const emojis = Array.from(interaction.guild.emojis.cache.values());
             if (emojis.length === 0) {
@@ -548,7 +614,11 @@ You can add an emoji and change its name using this Slash Command **/addemoji**
 
 ⌄ـــــــــــــــــــــــــــProEmojiـــــــــــــــــــــــــــــ⌄
 
-If you want to rename an emoji you can use this slash command **/rename_emoji** and the emoji name will be changed`
+If you want to rename an emoji you can use this slash command **/rename_emoji** and the emoji name will be changed
+
+⌄ـــــــــــــــــــــــــــProEmojiـــــــــــــــــــــــــــــ⌄
+
+You can convert an emoji to a sticker using this slash command **/emoji_to_sticker** and the emoji will be turned into a beautiful sticker!`
                     : `**أهلا بك هذا قائمة المساعدة الخاصة بي**
 ⌄ـــــــــــــــــــــــــــProEmojiـــــــــــــــــــــــــــــ⌄
 
@@ -572,7 +642,11 @@ If you want to rename an emoji you can use this slash command **/rename_emoji** 
 
 ⌄ـــــــــــــــــــــــــــProEmojiـــــــــــــــــــــــــــــ⌄
 
-إذا كنت تريد إعادة تسمية إيموجي يمكنك استخدام أمر الشرطة المائلة **/rename_emoji** وسيتم تغيير اسم الإيموجي`
+إذا كنت تريد إعادة تسمية إيموجي يمكنك استخدام أمر الشرطة المائلة **/rename_emoji** وسيتم تغيير اسم الإيموجي
+
+⌄ـــــــــــــــــــــــــــProEmojiـــــــــــــــــــــــــــــ⌄
+
+يمكنك تحويل إيموجي إلى ملصق باستخدام أمر الشرطة المائلة **/emoji_to_sticker** وسيتم تحويل الإيموجي إلى ملصق جميل!`
             )
             .setColor('#0099ff');
 
