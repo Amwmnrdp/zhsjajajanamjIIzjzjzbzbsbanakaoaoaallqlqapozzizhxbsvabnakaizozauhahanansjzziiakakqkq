@@ -383,16 +383,48 @@ client.on('interactionCreate', async interaction => {
                 return;
             }
 
-            try {
-                const emojiId = match[2];
-                const isAnimated = !!match[1];
-                const fileExtension = isAnimated ? '.gif' : '.png';
-                const emojiUrl = `https://cdn.discordapp.com/emojis/${match[3] + fileExtension}`;
+            const emojiIdNum = match[3];
+            const isAnimated = !!match[1];
+            const fileExtension = isAnimated ? '.gif' : '.png';
+            const emojiUrl = `https://cdn.discordapp.com/emojis/${emojiIdNum + fileExtension}`;
 
+            const existingStickers = interaction.guild.stickers.cache;
+            const duplicateByName = existingStickers.find(s => s.name.toLowerCase() === stickerName.toLowerCase());
+            const duplicateByEmoji = existingStickers.find(s => s.description && s.description.includes(emojiIdNum));
+
+            if (duplicateByName) {
+                const stickerUrl = `https://cdn.discordapp.com/stickers/${duplicateByName.id}.png`;
+                const embed = new EmbedBuilder()
+                    .setTitle(language === 'english' ? '⚠️ Sticker Already Exists!' : '⚠️ الملصق موجود بالفعل!')
+                    .setDescription(language === 'english' 
+                        ? `A sticker with this name already exists!\n\n**Existing Sticker Name:** ${duplicateByName.name}\n**Sticker ID:** ${duplicateByName.id}`
+                        : `يوجد ملصق بهذا الاسم بالفعل!\n\n**اسم الملصق الموجود:** ${duplicateByName.name}\n**معرف الملصق:** ${duplicateByName.id}`)
+                    .setThumbnail(stickerUrl)
+                    .setColor('#FF9900')
+                    .setFooter({ text: language === 'english' ? 'Please choose a different name.' : 'الرجاء اختيار اسم مختلف.' });
+                await interaction.reply({ embeds: [embed] });
+                return;
+            }
+
+            if (duplicateByEmoji) {
+                const stickerUrl = `https://cdn.discordapp.com/stickers/${duplicateByEmoji.id}.png`;
+                const embed = new EmbedBuilder()
+                    .setTitle(language === 'english' ? '⚠️ Emoji Already Converted!' : '⚠️ تم تحويل هذا الإيموجي مسبقاً!')
+                    .setDescription(language === 'english' 
+                        ? `This emoji has already been converted to a sticker!\n\n**Existing Sticker Name:** ${duplicateByEmoji.name}\n**Sticker ID:** ${duplicateByEmoji.id}`
+                        : `تم تحويل هذا الإيموجي إلى ملصق مسبقاً!\n\n**اسم الملصق الموجود:** ${duplicateByEmoji.name}\n**معرف الملصق:** ${duplicateByEmoji.id}`)
+                    .setThumbnail(stickerUrl)
+                    .setColor('#FF9900')
+                    .setFooter({ text: language === 'english' ? 'This sticker already exists in your server.' : 'هذا الملصق موجود بالفعل في خادمك.' });
+                await interaction.reply({ embeds: [embed] });
+                return;
+            }
+
+            try {
                 const sticker = await interaction.guild.stickers.create({
                     file: emojiUrl,
                     name: stickerName,
-                    description: language === 'english' ? `Converted from emoji: ${emojiInput}` : `تم التحويل من إيموجي: ${emojiInput}`,
+                    description: language === 'english' ? `Converted from emoji ID: ${emojiIdNum}` : `تم التحويل من إيموجي رقم: ${emojiIdNum}`,
                     reason: `By ${interaction.user.tag}`
                 });
 
