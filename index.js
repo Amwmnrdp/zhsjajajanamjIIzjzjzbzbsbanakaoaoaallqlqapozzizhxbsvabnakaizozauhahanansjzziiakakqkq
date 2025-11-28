@@ -403,12 +403,14 @@ client.on('interactionCreate', async interaction => {
             const urlOption = interaction.options.getString('url');
 
             if (!isImageUrl(urlOption)) {
-                await interaction.reply(language === 'english' ? '❌ Invalid image URL!' : '❌ رابط صورة غير صالح!');
+                const embed = new EmbedBuilder().setDescription(language === 'english' ? '❌ Invalid image URL!' : '❌ رابط صورة غير صالح!').setColor('#FF0000');
+                await interaction.reply({ embeds: [embed] });
                 return;
             }
 
             if (usedUrls[urlOption] && usedUrls[urlOption].includes(interaction.guild.id)) {
-                await interaction.reply(language === 'english' ? '⚠️ Image already used!' : '⚠️ الصورة مستخدمة بالفعل!');
+                const embed = new EmbedBuilder().setDescription(language === 'english' ? '⚠️ Image already used!' : '⚠️ الصورة مستخدمة بالفعل!').setColor('#FF9900');
+                await interaction.reply({ embeds: [embed] });
                 return;
             }
 
@@ -416,7 +418,8 @@ client.on('interactionCreate', async interaction => {
                 await interaction.guild.emojis.create({ attachment: urlOption, name: nameOption });
                 usedUrls[urlOption] = usedUrls[urlOption] || [];
                 usedUrls[urlOption].push(interaction.guild.id);
-                await interaction.reply(language === 'english' ? '✅ Image converted!' : '✅ تم التحويل!');
+                const embed = new EmbedBuilder().setDescription(language === 'english' ? '✅ Image converted to emoji!' : '✅ تم تحويل الصورة إلى إيموجي!').setColor('#00FF00');
+                await interaction.reply({ embeds: [embed] });
             } catch (error) {
                 const errorMsg = error.code === 50138 ? 
                     (language === 'english' ? 'Image must be under 256KB' : 'يجب أن تكون الصورة أقل من 256 كيلوبايت') :
@@ -612,7 +615,8 @@ client.on('interactionCreate', async interaction => {
         if (interaction.commandName === 'list_emojis') {
             const emojis = Array.from(interaction.guild.emojis.cache.values());
             if (emojis.length === 0) {
-                await interaction.reply({ content: language === 'english' ? '❌ No emojis.' : '❌ لا توجد ايموجيات.', ephemeral: true });
+                const embed = new EmbedBuilder().setDescription(language === 'english' ? '❌ No emojis.' : '❌ لا توجد ايموجيات.').setColor('#FF0000');
+                await interaction.reply({ embeds: [embed], ephemeral: true });
                 return;
             }
 
