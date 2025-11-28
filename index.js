@@ -137,6 +137,24 @@ client.once('ready', async () => {
                 ]
             },
             {
+                name: 'image_to_sticker',
+                description: 'Convert image to sticker',
+                options: [
+                    {
+                        name: 'url',
+                        type: ApplicationCommandOptionType.String,
+                        description: 'Image URL',
+                        required: true
+                    },
+                    {
+                        name: 'name',
+                        type: ApplicationCommandOptionType.String,
+                        description: 'Sticker name',
+                        required: true
+                    }
+                ]
+            },
+            {
                 name: 'list_emojis',
                 description: 'List all server emojis'
             },
@@ -446,6 +464,80 @@ client.on('interactionCreate', async interaction => {
             }
         }
 
+        if (interaction.commandName === 'image_to_sticker') {
+            if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageEmojisAndStickers)) {
+                const embed = new EmbedBuilder().setDescription(language === 'english' ? '❌ Need permission!' : '❌ تحتاج صلاحية!').setColor('#FF0000');
+                await interaction.reply({ embeds: [embed], ephemeral: true });
+                return;
+            }
+
+            const imageUrl = interaction.options.getString('url');
+            const stickerName = interaction.options.getString('name');
+
+            if (!isImageUrl(imageUrl)) {
+                const embed = new EmbedBuilder().setDescription(language === 'english' ? '❌ Invalid image URL!' : '❌ رابط صورة غير صالح!').setColor('#FF0000');
+                await interaction.reply({ embeds: [embed] });
+                return;
+            }
+
+            const existingStickers = interaction.guild.stickers.cache;
+            const duplicateByName = existingStickers.find(s => s.name.toLowerCase() === stickerName.toLowerCase());
+            const duplicateByUrl = existingStickers.find(s => s.description && s.description.includes(imageUrl));
+
+            if (duplicateByName) {
+                const stickerUrl = `https://cdn.discordapp.com/stickers/${duplicateByName.id}.png`;
+                const embed = new EmbedBuilder()
+                    .setTitle(language === 'english' ? '⚠️ Sticker Already Exists!' : '⚠️ الملصق موجود بالفعل!')
+                    .setDescription(language === 'english' 
+                        ? `A sticker with this name already exists!\n\n**Existing Sticker Name:** ${duplicateByName.name}\n**Sticker ID:** ${duplicateByName.id}`
+                        : `يوجد ملصق بهذا الاسم بالفعل!\n\n**اسم الملصق الموجود:** ${duplicateByName.name}\n**معرف الملصق:** ${duplicateByName.id}`)
+                    .setThumbnail(stickerUrl)
+                    .setColor('#FF9900')
+                    .setFooter({ text: language === 'english' ? 'Please choose a different name.' : 'الرجاء اختيار اسم مختلف.' });
+                await interaction.reply({ embeds: [embed] });
+                return;
+            }
+
+            if (duplicateByUrl) {
+                const stickerUrl = `https://cdn.discordapp.com/stickers/${duplicateByUrl.id}.png`;
+                const embed = new EmbedBuilder()
+                    .setTitle(language === 'english' ? '⚠️ Image Already Converted!' : '⚠️ تم تحويل هذه الصورة مسبقاً!')
+                    .setDescription(language === 'english' 
+                        ? `This image has already been converted to a sticker!\n\n**Existing Sticker Name:** ${duplicateByUrl.name}\n**Sticker ID:** ${duplicateByUrl.id}`
+                        : `تم تحويل هذه الصورة إلى ملصق مسبقاً!\n\n**اسم الملصق الموجود:** ${duplicateByUrl.name}\n**معرف الملصق:** ${duplicateByUrl.id}`)
+                    .setThumbnail(stickerUrl)
+                    .setColor('#FF9900')
+                    .setFooter({ text: language === 'english' ? 'This sticker already exists in your server.' : 'هذا الملصق موجود بالفعل في خادمك.' });
+                await interaction.reply({ embeds: [embed] });
+                return;
+            }
+
+            try {
+                const sticker = await interaction.guild.stickers.create({
+                    file: imageUrl,
+                    name: stickerName,
+                    description: language === 'english' ? `Converted from image: ${imageUrl}` : `تم التحويل من صورة: ${imageUrl}`,
+                    reason: `By ${interaction.user.tag}`
+                });
+
+                const embed = new EmbedBuilder()
+                    .setTitle(language === 'english' ? '✅ Sticker Created!' : '✅ تم إنشاء الملصق!')
+                    .setDescription(language === 'english' 
+                        ? `Successfully converted image to sticker!\n\n**Sticker Name:** ${stickerName}\n**Sticker ID:** ${sticker.id}`
+                        : `تم التحويل بنجاح من صورة إلى ملصق!\n\n**اسم الملصق:** ${stickerName}\n**معرف الملصق:** ${sticker.id}`)
+                    .setImage(imageUrl)
+                    .setColor('#00FF00')
+                    .setFooter({ text: language === 'english' ? 'You can now use this sticker in your server!' : 'يمكنك الآن استخدام هذا الملصق في خادمك!' });
+
+                await interaction.reply({ embeds: [embed] });
+            } catch (error) {
+                const embed = new EmbedBuilder()
+                    .setDescription(`❌ Error: ${error.message}`)
+                    .setColor('#FF0000');
+                await interaction.reply({ embeds: [embed] });
+            }
+        }
+
         if (interaction.commandName === 'list_emojis') {
             const emojis = Array.from(interaction.guild.emojis.cache.values());
             if (emojis.length === 0) {
@@ -650,7 +742,11 @@ If you want to rename an emoji you can use this slash command **/rename_emoji** 
 
 ⌄ـــــــــــــــــــــــــــProEmojiـــــــــــــــــــــــــــــ⌄
 
-You can convert an emoji to a sticker using this slash command **/emoji_to_sticker** and the emoji will be turned into a beautiful sticker!`
+You can convert an emoji to a sticker using this slash command **/emoji_to_sticker** and the emoji will be turned into a beautiful sticker!
+
+⌄ـــــــــــــــــــــــــــProEmojiـــــــــــــــــــــــــــــ⌄
+
+You can convert an image to a sticker using this slash command **/image_to_sticker** and the image will be turned into a beautiful sticker!`
                     : `**أهلا بك هذا قائمة المساعدة الخاصة بي**
 ⌄ـــــــــــــــــــــــــــProEmojiـــــــــــــــــــــــــــــ⌄
 
@@ -678,7 +774,11 @@ You can convert an emoji to a sticker using this slash command **/emoji_to_stick
 
 ⌄ـــــــــــــــــــــــــــProEmojiـــــــــــــــــــــــــــــ⌄
 
-يمكنك تحويل إيموجي إلى ملصق باستخدام أمر الشرطة المائلة **/emoji_to_sticker** وسيتم تحويل الإيموجي إلى ملصق جميل!`
+يمكنك تحويل إيموجي إلى ملصق باستخدام أمر الشرطة المائلة **/emoji_to_sticker** وسيتم تحويل الإيموجي إلى ملصق جميل!
+
+⌄ـــــــــــــــــــــــــــProEmojiـــــــــــــــــــــــــــــ⌄
+
+يمكنك تحويل صورة إلى ملصق باستخدام أمر الشرطة المائلة **/image_to_sticker** وسيتم تحويل الصورة إلى ملصق جميل!`
             )
             .setColor('#0099ff');
 
