@@ -30,6 +30,7 @@ const serverLanguages = new Map();
 const usedUrls = {};
 let suggestedEmojis = [];
 const stickerDeletionSessions = new Map();
+const stickerToEmojiSessions = new Map();
 const SERVERS_FILE = 'servers.json';
 
 function parseEmoji(emoji) {
@@ -205,6 +206,18 @@ client.once('ready', async () => {
             {
                 name: 'delete_sticker',
                 description: 'Delete a sticker'
+            },
+            {
+                name: 'sticker_to_emoji',
+                description: 'Convert sticker to emoji',
+                options: [
+                    {
+                        name: 'name',
+                        type: ApplicationCommandOptionType.String,
+                        description: 'Emoji name',
+                        required: true
+                    }
+                ]
             }
         ];
 
@@ -773,6 +786,41 @@ client.on('interactionCreate', async interaction => {
                 }
             }, 60000);
         }
+
+        if (interaction.commandName === 'sticker_to_emoji') {
+            if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageEmojisAndStickers)) {
+                const embed = new EmbedBuilder().setDescription(language === 'english' ? '❌ Need permission!' : '❌ تحتاج صلاحية!').setColor('#FF0000');
+                await interaction.reply({ embeds: [embed], ephemeral: true });
+                return;
+            }
+
+            const emojiName = interaction.options.getString('name');
+
+            const embed = new EmbedBuilder()
+                .setTitle(language === 'english' ? '📌 Reply with Sticker' : '📌 رد باستخدام ملصق')
+                .setDescription(language === 'english' 
+                    ? `Reply to this message using the sticker you want to convert to an emoji.\n\n**Emoji Name:** ${emojiName}`
+                    : `رد على هذه الرسالة باستخدام الملصق الذي تريد تحويله إلى إيموجي.\n\n**اسم الإيموجي:** ${emojiName}`)
+                .setColor('#00FFFF')
+                .setFooter({ text: language === 'english' ? 'Waiting for your sticker...' : 'في انتظار ملصقك...' });
+
+            const msg = await interaction.reply({ embeds: [embed], fetchReply: true });
+            
+            stickerToEmojiSessions.set(msg.id, {
+                guildId: interaction.guild.id,
+                userId: interaction.user.id,
+                language: language,
+                messageId: msg.id,
+                channelId: msg.channel.id,
+                emojiName: emojiName
+            });
+
+            setTimeout(() => {
+                if (stickerToEmojiSessions.has(msg.id)) {
+                    stickerToEmojiSessions.delete(msg.id);
+                }
+            }, 60000);
+        }
     } catch (error) {
         console.error('⚠️ Discord Error in interaction handler:', error.code, error.message);
     }
@@ -782,13 +830,15 @@ client.on('messageCreate', async message => {
     if (message.author.bot || !message.guild) return;
     const language = serverLanguages.get(message.guild.id) || 'english';
 
-    // Handle sticker deletion replies
+    // Handle sticker deletion and conversion replies
     if (message.reference && message.stickers && message.stickers.size > 0) {
         try {
             const repliedTo = await message.channel.messages.fetch(message.reference.messageId);
-            const session = stickerDeletionSessions.get(repliedTo.id);
+            const deletionSession = stickerDeletionSessions.get(repliedTo.id);
+            const conversionSession = stickerToEmojiSessions.get(repliedTo.id);
             
-            if (session && session.userId === message.author.id && session.guildId === message.guild.id) {
+            // Handle sticker deletion
+            if (deletionSession && deletionSession.userId === message.author.id && deletionSession.guildId === message.guild.id) {
                 const sticker = message.stickers.first();
                 const serverStickers = message.guild.stickers.cache;
                 const stickerToDelete = serverStickers.find(s => s.id === sticker.id);
@@ -824,8 +874,40 @@ client.on('messageCreate', async message => {
                     await message.reply({ embeds: [embed] });
                 }
             }
+            
+            // Handle sticker to emoji conversion
+            if (conversionSession && conversionSession.userId === message.author.id && conversionSession.guildId === message.guild.id) {
+                const sticker = message.stickers.first();
+                const emojiName = conversionSession.emojiName;
+                const stickerUrl = sticker.url;
+
+                try {
+                    await message.guild.emojis.create({ attachment: stickerUrl, name: emojiName });
+                    const embed = new EmbedBuilder()
+                        .setTitle(language === 'english' ? '✅ Emoji Created!' : '✅ تم إنشاء الإيموجي!')
+                        .setDescription(language === 'english' 
+                            ? `Successfully converted sticker to emoji!\n\n**Emoji Name:** ${emojiName}\n**Source Sticker:** ${sticker.name}`
+                            : `تم التحويل بنجاح من ملصق إلى إيموجي!\n\n**اسم الإيموجي:** ${emojiName}\n**الملصق الأصلي:** ${sticker.name}`)
+                        .setImage(stickerUrl)
+                        .setColor('#00FF00')
+                        .setFooter({ text: language === 'english' ? 'You can now use this emoji in your server!' : 'يمكنك الآن استخدام هذا الإيموجي في خادمك!' });
+                    await message.reply({ embeds: [embed] });
+                    stickerToEmojiSessions.delete(repliedTo.id);
+                } catch (error) {
+                    const errorMsg = error.code === 50138 ?
+                        (language === 'english' ? 'Sticker must be under 256KB' : 'يجب أن يكون الملصق أقل من 256 كيلوبايت') :
+                        error.code === 50013 ?
+                        (language === 'english' ? 'Missing permissions to create emoji' : 'لا توجد صلاحيات لإنشاء إيموجي') :
+                        (language === 'english' ? 'Error: ' : 'خطأ: ') + error.message;
+                    const embed = new EmbedBuilder()
+                        .setDescription(`❌ ${errorMsg}`)
+                        .setColor('#FF0000');
+                    await message.reply({ embeds: [embed] });
+                    console.error(`⚠️ Discord Error in sticker to emoji conversion:`, error.code, error.message);
+                }
+            }
         } catch (error) {
-            console.error('Sticker deletion error:', error);
+            console.error('Sticker processing error:', error);
         }
     }
 
@@ -871,7 +953,11 @@ You can convert an image to a sticker using this slash command **/image_to_stick
 
 ⌄ـــــــــــــــــــــــــــProEmojiـــــــــــــــــــــــــــــ⌄
 
-You can delete a sticker using this slash command **/delete_sticker** and then reply with the sticker you want to delete!`
+You can delete a sticker using this slash command **/delete_sticker** and then reply with the sticker you want to delete!
+
+⌄ـــــــــــــــــــــــــــProEmojiـــــــــــــــــــــــــــــ⌄
+
+You can convert a sticker to an emoji using this slash command **/sticker_to_emoji** and then reply with the sticker you want to convert!`
                     : `**أهلا بك هذا قائمة المساعدة الخاصة بي**
 ⌄ـــــــــــــــــــــــــــProEmojiـــــــــــــــــــــــــــــ⌄
 
@@ -907,7 +993,11 @@ You can delete a sticker using this slash command **/delete_sticker** and then r
 
 ⌄ـــــــــــــــــــــــــــProEmojiـــــــــــــــــــــــــــــ⌄
 
-يمكنك حذف ملصق باستخدام أمر الشرطة المائلة **/delete_sticker** ثم رد برسالة تحتوي على الملصق الذي تريد حذفه!`
+يمكنك حذف ملصق باستخدام أمر الشرطة المائلة **/delete_sticker** ثم رد برسالة تحتوي على الملصق الذي تريد حذفه!
+
+⌄ـــــــــــــــــــــــــــProEmojiـــــــــــــــــــــــــــــ⌄
+
+يمكنك تحويل ملصق إلى إيموجي باستخدام أمر الشرطة المائلة **/sticker_to_emoji** ثم رد برسالة تحتوي على الملصق الذي تريد تحويله!`
             )
             .setColor('#0099ff');
 
