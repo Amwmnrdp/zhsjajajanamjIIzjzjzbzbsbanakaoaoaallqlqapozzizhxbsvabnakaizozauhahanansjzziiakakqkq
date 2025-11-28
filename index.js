@@ -416,10 +416,10 @@ client.on('interactionCreate', async interaction => {
             const gatewayLatency = Math.round(client.ws.ping);
             
             const embed = new EmbedBuilder()
-                .setTitle('🏓 ' + await t('Pong!', langCode))
+                .setTitle('🏓 Pong!')
                 .setDescription(
-                    await t('Gateway latency:', langCode) + ' ' + gatewayLatency + 'ms\n' +
-                    await t('Response time:', langCode) + ' ' + (Date.now() - startTime) + 'ms'
+                    'Gateway latency: ' + gatewayLatency + 'ms\n' +
+                    'Response time: ' + (Date.now() - startTime) + 'ms'
                 )
                 .setColor('#00FFFF');
             await interaction.reply({ embeds: [embed] });
