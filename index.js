@@ -52,7 +52,7 @@ const SUPPORTED_LANGUAGES = {
     'it': { name: 'Italian', flag: '🇮🇹', native: 'Italiano', translateCode: 'it' },
     'ja': { name: 'Japanese', flag: '🇯🇵', native: '日本語', translateCode: 'ja' },
     'ko': { name: 'Korean', flag: '🇰🇷', native: '한국어', translateCode: 'ko' },
-    'pt': { name: 'Portuguese', flag: '🇧🇷', native: 'Português', translateCode: 'pt' }
+    'pt': { name: 'Portuguese', flag: '🇵🇹', native: 'Português', translateCode: 'pt' }
 };
 
 function readLanguagesFile() {
@@ -853,7 +853,16 @@ client.on('interactionCreate', async interaction => {
                 .addOptions(options);
 
             const row = new ActionRowBuilder().addComponents(selectMenu);
-            await interaction.reply({ embeds: [embed], components: [row] });
+            const msg = await interaction.reply({ embeds: [embed], components: [row], fetchReply: true });
+            
+            const filter = i => i.customId === 'language_select' && i.user.id === interaction.user.id;
+            const collector = msg.createMessageComponentCollector({ filter, time: 60000 });
+            
+            collector.on('end', collected => {
+                if (collected.size === 0) {
+                    msg.edit({ components: [] }).catch(() => {});
+                }
+            });
         }
 
         if (interaction.commandName === 'delete_emoji') {
