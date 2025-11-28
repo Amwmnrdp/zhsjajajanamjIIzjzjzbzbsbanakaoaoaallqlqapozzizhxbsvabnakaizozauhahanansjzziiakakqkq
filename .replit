@@ -22,3 +22,26 @@ expertMode = true
 [[ports]]
 localPort = 3000
 externalPort = 80
+
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "ProEmoji Bot"
+
+[[workflows.workflow]]
+name = "ProEmoji Bot"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node index.js"
+
+[workflows.workflow.metadata]
+outputType = "console"

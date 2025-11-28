@@ -405,49 +405,39 @@ client.on('interactionCreate', async interaction => {
                 return;
             }
 
-    const embed = new EmbedBuilder()
-        .setTitle('🌐 Choose Language - اختر اللغة')
-        .setColor('#00FFFF')
-        .setDescription('Choose your language:\nاختر لغتك:')
-        .addFields(
-            { name: '🇺🇸 English', value: 'React with 🇺🇸', inline: true },
-            { name: '<:Syria:1443915175379079208> العربية', value: 'تفاعل بـ <:Syria:1443915175379079208>', inline: true }
-        );
+            const embed = new EmbedBuilder()
+                .setTitle('🌐 Choose Language - اختر اللغة')
+                .setColor('#00FFFF')
+                .setDescription('Choose your language:\nاختر لغتك:')
+                .addFields(
+                    { name: '🇺🇸 English', value: 'React with 🇺🇸', inline: true },
+                    { name: '<:Syria:1443915175379079208> العربية', value: 'تفاعل بـ <:Syria:1443915175379079208>', inline: true }
+                );
 
-    const msg = await interaction.reply({ embeds: [embed], fetchReply: true });
+            const msg = await interaction.reply({ embeds: [embed], fetchReply: true });
 
-    await msg.react('🇺🇸');
-    await msg.react('<:Syria:1443915175379079208>');
+            await msg.react('🇺🇸');
+            await msg.react('<:Syria:1443915175379079208>');
 
-    const filter = (reaction, user) =>
-        (reaction.emoji.name === '🇺🇸' ||
-         reaction.emoji.id === '1443915175379079208') &&
-        user.id === interaction.user.id;
+            const filter = (reaction, user) =>
+                (reaction.emoji.name === '🇺🇸' ||
+                 reaction.emoji.id === '1443915175379079208') &&
+                user.id === interaction.user.id;
 
-    msg.awaitReactions({ filter, max: 1, time: 60000, errors: ['time'] })
-        .then(collected => {
-            const reaction = collected.first();
+            msg.awaitReactions({ filter, max: 1, time: 60000, errors: ['time'] })
+                .then(collected => {
+                    const reaction = collected.first();
 
-            if (reaction.emoji.name === '🇺🇸') {
-                serverLanguages.set(interaction.guild.id, 'english');
-                interaction.followUp('✅ Language set to English!');
-            } else {
-                serverLanguages.set(interaction.guild.id, 'arabic');
-                interaction.followUp('✅ تم تعيين اللغة إلى العربية!');
-            }
-        })
-        .catch(() => interaction.followUp('⏳ Timeout.'));
-       }client.on('messageCreate', async message => {
-    if (message.author.bot || !message.guild) return;
-    const language = serverLanguages.get(message.guild.id) || 'english';
-
-    if (message.content.startsWith(prefix + 'help')) {
-        message.channel.send(language === 'english' ? '**Check your DM**' : '**شوف خاصك**').then(m => setTimeout(() => m.delete(), 5000));
-
-        const embed = new EmbedBuilder()
-            .setTitle(language === 'english' ? '📖 ProEmoji Help' : '📖 مساعدة ProEmoji')
-                
-                
+                    if (reaction.emoji.name === '🇺🇸') {
+                        serverLanguages.set(interaction.guild.id, 'english');
+                        interaction.followUp('✅ Language set to English!');
+                    } else {
+                        serverLanguages.set(interaction.guild.id, 'arabic');
+                        interaction.followUp('✅ تم تعيين اللغة إلى العربية!');
+                    }
+                })
+                .catch(() => interaction.followUp('⏳ Timeout.'));
+        }
 
         if (interaction.commandName === 'delete_emoji') {
             if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageEmojisAndStickers)) {
@@ -519,12 +509,10 @@ client.on('interactionCreate', async interaction => {
                 await interaction.reply({ embeds: [embed] });
             }
         }
-
     } catch (error) {
         console.error('Error:', error);
     }
 });
-
 
 client.on('messageCreate', async message => {
     if (message.author.bot || !message.guild) return;
@@ -535,9 +523,9 @@ client.on('messageCreate', async message => {
 
         const embed = new EmbedBuilder()
             .setTitle(language === 'english' ? '📖 ProEmoji Help' : '📖 مساعدة ProEmoji')
-        .setDescription(
-          language === 'english'
-            ? `**Welcome, this is my help menu**
+            .setDescription(
+                language === 'english'
+                    ? `**Welcome, this is my help menu**
 ⌄ـــــــــــــــــــــــــــProEmojiـــــــــــــــــــــــــــــ⌄
 
 The prefix of the bot is **[ + ]**
@@ -560,155 +548,35 @@ You can add an emoji and change its name using this Slash Command **/addemoji**
 
 ⌄ـــــــــــــــــــــــــــProEmojiـــــــــــــــــــــــــــــ⌄
 
-If you want to rename an emoji you can use this slash command **/rename_emoji** and the emoji name will be changed
-
-⌄ـــــــــــــــــــــــــــProEmojiـــــــــــــــــــــــــــــ⌄
-
-You can delete an emoji using this slash command **/delete_emoji** to remove it from the server
-
-⌄ـــــــــــــــــــــــــــProEmojiـــــــــــــــــــــــــــــ⌄
-
-You can view all server emojis using this slash command **/list_emojis** with page navigation
-
-⌄ـــــــــــــــــــــــــــProEmojiـــــــــــــــــــــــــــــ⌄
-
-You can change the bot's language using this Slash Command **/language** (English/Arabic)
-
-⌄ـــــــــــــــــــــــــــProEmojiـــــــــــــــــــــــــــــ⌄
-
-Admins can use **/permission** to allow or deny the bot from suggesting your server emojis to others
-
-⌄ـــــــــــــــــــــــــــProEmojiـــــــــــــــــــــــــــــ⌄
-
-**I hope you like the bot and enjoy using it 😉**
-`
-            : `**مرحباً، هذه هي قائمة المساعدة الخاصة بي**
+If you want to rename an emoji you can use this slash command **/rename_emoji** and the emoji name will be changed`
+                    : `**أهلا بك هذا قائمة المساعدة الخاصة بي**
 ⌄ـــــــــــــــــــــــــــProEmojiـــــــــــــــــــــــــــــ⌄
 
 بادئة البوت هي **[ + ]**
 
 ⌄ـــــــــــــــــــــــــــProEmojiـــــــــــــــــــــــــــــ⌄
 
-اذا كنت لا تملك نيترو تستطيع كتابة هذا الامر **+suggestemojis** حتى يقترح لك البوت ايموجيات من سيرفرات مختلفة
+إذا لم تكن لديك Nitro يمكنك كتابة هذا الأمر **+suggestemojis** حتى يقترح عليك البوت الإيموجيات من خوادم مختلفة
 
 ⌄ـــــــــــــــــــــــــــProEmojiـــــــــــــــــــــــــــــ⌄
 
-يمكنك استخدام امر سلاش كوماند **/image_to_emoji** حتى يتم تحويل رابط الصورة الى ايموجي و يحفظها في سيرفرك
+يمكنك استخدام أمر الشرطة المائلة **/image_to_emoji** لتحويل رابط صورة إلى إيموجي وحفظه على خادمك
 
 ⌄ـــــــــــــــــــــــــــProEmojiـــــــــــــــــــــــــــــ⌄
 
-يمكنك اضافة ايموجي باستخدام هذا الامر **+addemoji** و سوف تستطيع اضافة ايموجي مع اسم الايموجي الاصلي
+يمكنك إضافة إيموجي باستخدام هذا الأمر **+addemoji** وستتمكن من إضافة إيموجي باسمه الأصلي
 
 ⌄ـــــــــــــــــــــــــــProEmojiـــــــــــــــــــــــــــــ⌄
 
-يمكنك اضافة ايموجي مع تغيير الاسم باستخدام سلاش كوماند **/addemoji**
+يمكنك إضافة إيموجي وتغيير اسمه باستخدام أمر الشرطة المائلة **/addemoji**
 
 ⌄ـــــــــــــــــــــــــــProEmojiـــــــــــــــــــــــــــــ⌄
 
-اذا كنت تريد تغيير اسم الايموجي يمكنك استخدام امر السلاش كوماند **/rename_emoji** و سوف يتم تغيير اسم الايموجي
+إذا كنت تريد إعادة تسمية إيموجي يمكنك استخدام أمر الشرطة المائلة **/rename_emoji** وسيتم تغيير اسم الإيموجي`
+            )
+            .setColor('#0099ff');
 
-⌄ـــــــــــــــــــــــــــProEmojiـــــــــــــــــــــــــــــ⌄
-
-يمكنك حذف ايموجي باستخدام سلاش كوماند **/delete_emoji** لإزالته من السيرفر
-
-⌄ـــــــــــــــــــــــــــProEmojiـــــــــــــــــــــــــــــ⌄
-
-يمكنك عرض جميع ايموجيات السيرفر باستخدام سلاش كوماند **/list_emojis** مع صفحات للتنقل
-
-⌄ـــــــــــــــــــــــــــProEmojiـــــــــــــــــــــــــــــ⌄
-
-تستطيع تغيير لغة البوت باستخدام هذا السلاش كوماند **/language** (انجليزي/عربي)
-
-⌄ـــــــــــــــــــــــــــProEmojiـــــــــــــــــــــــــــــ⌄
-
-المسؤولون يمكنهم استخدام **/permission** للسماح أو رفض اقتراح ايموجيات سيرفرك للآخرين
-
-⌄ـــــــــــــــــــــــــــProEmojiـــــــــــــــــــــــــــــ⌄
-
-**اتمنى ان يعجبك البوت و تستمتع باستخدامه😉**
-`
-        )
-        .setFooter({ text: `ProEmoji` })
-        .setColor(`#00FFFF`)
-        .setTimestamp();
-
-      message.author.send({ embeds: [embed] }).catch(error => message.reply(language === 'english' ? '**Please open your DM**' : '**رجاء فتح خاصك**'));
-};
-
-    if (message.content.startsWith(prefix + 'addemoji')) {
-        if (!message.member.permissions.has(PermissionsBitField.Flags.ManageEmojisAndStickers)) {
-            const embed = new EmbedBuilder().setDescription(language === 'english' ? '❌ Need permission!' : '❌ تحتاج صلاحية!').setColor('#FF0000');
-            message.channel.send({ embeds: [embed] }).then(m => setTimeout(() => m.delete(), 5000));
-            return;
-        }
-
-        let args = message.content.split(' ').slice(1);
-        if (!args.length) {
-            const embed = new EmbedBuilder().setDescription(language === 'english' ? '**Provide an emoji!**' : '**أدخل ايموجي!**').setColor('#00FFFF');
-            message.channel.send({ embeds: [embed] });
-            return;
-        }
-
-        let names = [];
-        for (let emoji of args) {
-            let info = parseEmoji(emoji);
-            if (!info.id) continue;
-            if (message.guild.emojis.cache.find(e => e.name === info.name && e.id === info.id)) continue;
-
-            let type = info.animated ? '.gif' : '.png';
-            let url = `https://cdn.discordapp.com/emojis/${info.id + type}`;
-            const emj = await message.guild.emojis.create({ attachment: url, name: info.name, reason: `By ${client.user.tag}` });
-            names.push(emj);
-        }
-
-        if (names.length) {
-            const embed = new EmbedBuilder().setDescription(language === 'english' ? `✅ Added: ${names.join(' ')}` : `✅ تمت الإضافة: ${names.join(' ')}`).setColor('#00FFFF');
-            message.channel.send({ embeds: [embed] });
-        }
-    }
-
-    if (message.content === prefix + 'suggestemojis') {
-        if (!message.member.permissions.has(PermissionsBitField.Flags.ManageEmojisAndStickers)) {
-            const embed = new EmbedBuilder().setDescription(language === 'english' ?'❌ Need permission!' : '❌ تحتاج صلاحية!').setColor('#FF0000');
-            message.channel.send({ embeds: [embed] }).then(m => setTimeout(() => m.delete(), 5000));
-            return;
-        }
-
-        let emojis = [];
-        client.guilds.cache.forEach(guild => {
-            if (allowedServers.get(guild.id) === true) {
-                guild.emojis.cache.forEach(emoji => {
-                    if (!emojis.includes(emoji) && !message.guild.emojis.cache.find(e => e.name === emoji.name)) {
-                        emojis.push(emoji);
-                    }
-                });
-            }
-        });
-
-        if (emojis.length === 0) {
-            const embed = new EmbedBuilder()
-                .setDescription(language === 'english' ? '❌ No emojis available!' : '❌ لا توجد ايموجيات متاحة!')
-                .setColor('#FF0000');
-            message.channel.send({ embeds: [embed] });
-            return;
-        }
-
-        emojis = emojis.sort(() => Math.random() - 0.5).slice(0, 5);
-        suggestedEmojis = emojis;
-
-        let reply = language === 'english' 
-            ? 'Here are 5 suggested emojis: ' 
-            : 'هذه 5 اقتراحات ايموجيات: ';
-        
-        emojis.forEach(emoji => {
-            reply += `${emoji} `;
-        });
-        
-        reply += language === 'english' 
-            ? '\nDo you want to add these emojis? (Reply with `yes` or `no`)' 
-            : '\nهل تريد إضافة هذه الايموجيات؟ (رد بـ `نعم` أو `لا`)';
-        
-        message.channel.send(reply);
+        await message.author.send({ embeds: [embed] }).catch(() => message.reply(language === 'english' ? '❌ Could not send DM!' : '❌ لم أستطع إرسال رسالة خاصة!'));
     }
 
     if (message.content === 'نعم' || message.content.toLowerCase() === 'yes') {
@@ -731,7 +599,8 @@ Admins can use **/permission** to allow or deny the bot from suggesting your ser
             suggestedEmojis = [];
         }
     }
-});// Express server - هذا فقط لإبقاء Replit شغال ولا يوقف البوت
+});
+
 app.get('/', (req, res) => {
     res.send('✅ ProEmoji Bot is Running!');
 });
@@ -741,7 +610,6 @@ app.listen(PORT, () => {
     console.log(`🌐 Server running on port ${PORT}`);
 });
 
-// Login - استخدام process.env مباشرة من Replit Secrets
 client.login(process.env.token).catch(err => {
     console.error('❌ Failed to login:', err);
     console.error('تأكد من إضافة token في Replit Secrets!');
