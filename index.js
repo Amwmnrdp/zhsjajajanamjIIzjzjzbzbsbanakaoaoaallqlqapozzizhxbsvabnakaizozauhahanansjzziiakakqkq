@@ -31,6 +31,9 @@ const usedUrls = {};
 let suggestedEmojis = [];
 const stickerDeletionSessions = new Map();
 const stickerToEmojiSessions = new Map();
+const convertedEmojisToStickers = new Map();
+const convertedImagesToStickers = new Map();
+const convertedStickersToEmojis = new Map();
 const SERVERS_FILE = 'servers.json';
 
 function parseEmoji(emoji) {
@@ -448,34 +451,35 @@ client.on('interactionCreate', async interaction => {
             const fileExtension = isAnimated ? '.gif' : '.png';
             const emojiUrl = `https://cdn.discordapp.com/emojis/${emojiIdNum + fileExtension}`;
 
+            const trackingKey = `${interaction.guild.id}:${emojiIdNum}`;
+            if (convertedEmojisToStickers.has(trackingKey)) {
+                const stickerInfo = convertedEmojisToStickers.get(trackingKey);
+                const stickerUrl = `https://cdn.discordapp.com/stickers/${stickerInfo.stickerId}.png`;
+                const embed = new EmbedBuilder()
+                    .setTitle(language === 'english' ? '⚠️ Emoji Already Converted!' : '⚠️ تم تحويل هذا الإيموجي مسبقاً!')
+                    .setDescription(language === 'english' 
+                        ? `This emoji has already been converted to a sticker!\n\n**Existing Sticker Name:** ${stickerInfo.stickerName}\n**Sticker ID:** ${stickerInfo.stickerId}\n\nDelete the sticker to convert again.`
+                        : `تم تحويل هذا الإيموجي إلى ملصق مسبقاً!\n\n**اسم الملصق الموجود:** ${stickerInfo.stickerName}\n**معرف الملصق:** ${stickerInfo.stickerId}\n\nاحذف الملصق لتحويله مجدداً.`)
+                    .setThumbnail(stickerUrl)
+                    .setColor('#FF9900')
+                    .setFooter({ text: language === 'english' ? 'This conversion is already done.' : 'تم إجراء هذا التحويل بالفعل.' });
+                await interaction.reply({ embeds: [embed] });
+                return;
+            }
+
             const existingStickers = interaction.guild.stickers.cache;
             const duplicateByName = existingStickers.find(s => s.name.toLowerCase() === stickerName.toLowerCase());
-            const duplicateByEmoji = existingStickers.find(s => s.description && s.description.includes(emojiIdNum));
 
             if (duplicateByName) {
                 const stickerUrl = `https://cdn.discordapp.com/stickers/${duplicateByName.id}.png`;
                 const embed = new EmbedBuilder()
-                    .setTitle(language === 'english' ? '⚠️ Sticker Already Exists!' : '⚠️ الملصق موجود بالفعل!')
+                    .setTitle(language === 'english' ? '⚠️ Sticker Name Already Exists!' : '⚠️ اسم الملصق موجود بالفعل!')
                     .setDescription(language === 'english' 
                         ? `A sticker with this name already exists!\n\n**Existing Sticker Name:** ${duplicateByName.name}\n**Sticker ID:** ${duplicateByName.id}`
                         : `يوجد ملصق بهذا الاسم بالفعل!\n\n**اسم الملصق الموجود:** ${duplicateByName.name}\n**معرف الملصق:** ${duplicateByName.id}`)
                     .setThumbnail(stickerUrl)
                     .setColor('#FF9900')
                     .setFooter({ text: language === 'english' ? 'Please choose a different name.' : 'الرجاء اختيار اسم مختلف.' });
-                await interaction.reply({ embeds: [embed] });
-                return;
-            }
-
-            if (duplicateByEmoji) {
-                const stickerUrl = `https://cdn.discordapp.com/stickers/${duplicateByEmoji.id}.png`;
-                const embed = new EmbedBuilder()
-                    .setTitle(language === 'english' ? '⚠️ Emoji Already Converted!' : '⚠️ تم تحويل هذا الإيموجي مسبقاً!')
-                    .setDescription(language === 'english' 
-                        ? `This emoji has already been converted to a sticker!\n\n**Existing Sticker Name:** ${duplicateByEmoji.name}\n**Sticker ID:** ${duplicateByEmoji.id}`
-                        : `تم تحويل هذا الإيموجي إلى ملصق مسبقاً!\n\n**اسم الملصق الموجود:** ${duplicateByEmoji.name}\n**معرف الملصق:** ${duplicateByEmoji.id}`)
-                    .setThumbnail(stickerUrl)
-                    .setColor('#FF9900')
-                    .setFooter({ text: language === 'english' ? 'This sticker already exists in your server.' : 'هذا الملصق موجود بالفعل في خادمك.' });
                 await interaction.reply({ embeds: [embed] });
                 return;
             }
@@ -498,6 +502,11 @@ client.on('interactionCreate', async interaction => {
                     .setFooter({ text: language === 'english' ? 'You can now use this sticker in your server!' : 'يمكنك الآن استخدام هذا الملصق في خادمك!' });
 
                 await interaction.reply({ embeds: [embed] });
+                convertedEmojisToStickers.set(trackingKey, {
+                    stickerId: sticker.id,
+                    stickerName: stickerName,
+                    emojiId: emojiIdNum
+                });
             } catch (error) {
                 const errorMsg = error.code === 50045 ?
                     (language === 'english' ? 'Emoji URL is invalid or unavailable' : 'رابط الإيموجي غير صالح أو غير متاح') :
@@ -528,13 +537,29 @@ client.on('interactionCreate', async interaction => {
                 return;
             }
 
+            const imageTrackingKey = `${interaction.guild.id}:${imageUrl}`;
+            if (convertedImagesToStickers.has(imageTrackingKey)) {
+                const stickerInfo = convertedImagesToStickers.get(imageTrackingKey);
+                const stickerUrl = `https://cdn.discordapp.com/stickers/${stickerInfo.stickerId}.png`;
+                const embed = new EmbedBuilder()
+                    .setTitle(language === 'english' ? '⚠️ Image Already Converted!' : '⚠️ تم تحويل هذه الصورة مسبقاً!')
+                    .setDescription(language === 'english' 
+                        ? `This image has already been converted to a sticker!\n\n**Existing Sticker Name:** ${stickerInfo.stickerName}\n**Sticker ID:** ${stickerInfo.stickerId}\n\nDelete the sticker to convert again.`
+                        : `تم تحويل هذه الصورة إلى ملصق مسبقاً!\n\n**اسم الملصق الموجود:** ${stickerInfo.stickerName}\n**معرف الملصق:** ${stickerInfo.stickerId}\n\nاحذف الملصق لتحويله مجدداً.`)
+                    .setThumbnail(stickerUrl)
+                    .setColor('#FF9900')
+                    .setFooter({ text: language === 'english' ? 'This conversion is already done.' : 'تم إجراء هذا التحويل بالفعل.' });
+                await interaction.reply({ embeds: [embed] });
+                return;
+            }
+
             const existingStickers = interaction.guild.stickers.cache;
             const duplicateByName = existingStickers.find(s => s.name.toLowerCase() === stickerName.toLowerCase());
 
             if (duplicateByName) {
                 const stickerUrl = `https://cdn.discordapp.com/stickers/${duplicateByName.id}.png`;
                 const embed = new EmbedBuilder()
-                    .setTitle(language === 'english' ? '⚠️ Sticker Already Exists!' : '⚠️ الملصق موجود بالفعل!')
+                    .setTitle(language === 'english' ? '⚠️ Sticker Name Already Exists!' : '⚠️ اسم الملصق موجود بالفعل!')
                     .setDescription(language === 'english' 
                         ? `A sticker with this name already exists!\n\n**Existing Sticker Name:** ${duplicateByName.name}\n**Sticker ID:** ${duplicateByName.id}`
                         : `يوجد ملصق بهذا الاسم بالفعل!\n\n**اسم الملصق الموجود:** ${duplicateByName.name}\n**معرف الملصق:** ${duplicateByName.id}`)
@@ -563,6 +588,11 @@ client.on('interactionCreate', async interaction => {
                     .setFooter({ text: language === 'english' ? 'You can now use this sticker in your server!' : 'يمكنك الآن استخدام هذا الملصق في خادمك!' });
 
                 await interaction.reply({ embeds: [embed] });
+                convertedImagesToStickers.set(imageTrackingKey, {
+                    stickerId: sticker.id,
+                    stickerName: stickerName,
+                    imageUrl: imageUrl
+                });
             } catch (error) {
                 const errorMsg = error.code === 50045 ?
                     (language === 'english' ? 'Image URL is invalid or unavailable' : 'رابط الصورة غير صالح أو غير متاح') :
@@ -701,6 +731,11 @@ client.on('interactionCreate', async interaction => {
 
             try {
                 await emj.delete();
+                convertedStickersToEmojis.forEach((value, key) => {
+                    if (value.emojiId === emojiId) {
+                        convertedStickersToEmojis.delete(key);
+                    }
+                });
                 const embed = new EmbedBuilder().setDescription(language === 'english' ? `✅ Emoji deleted!` : `✅ تم حذف الايموجي!`).setColor('#00FF00');
                 await interaction.reply({ embeds: [embed] });
             } catch (error) {
@@ -846,11 +881,26 @@ client.on('messageCreate', async message => {
                 if (stickerToDelete) {
                     try {
                         await stickerToDelete.delete();
+                        convertedEmojisToStickers.forEach((value, key) => {
+                            if (value.stickerId === stickerToDelete.id) {
+                                convertedEmojisToStickers.delete(key);
+                            }
+                        });
+                        convertedImagesToStickers.forEach((value, key) => {
+                            if (value.stickerId === stickerToDelete.id) {
+                                convertedImagesToStickers.delete(key);
+                            }
+                        });
+                        convertedStickersToEmojis.forEach((value, key) => {
+                            if (value.stickerId === stickerToDelete.id) {
+                                convertedStickersToEmojis.delete(key);
+                            }
+                        });
                         const embed = new EmbedBuilder()
                             .setTitle(language === 'english' ? '✅ Sticker Deleted!' : '✅ تم حذف الملصق!')
                             .setDescription(language === 'english' 
-                                ? `Successfully deleted sticker: **${stickerToDelete.name}**`
-                                : `تم حذف الملصق بنجاح: **${stickerToDelete.name}**`)
+                                ? `Successfully deleted sticker: **${stickerToDelete.name}**\n\nYou can now convert the source emoji/image again.`
+                                : `تم حذف الملصق بنجاح: **${stickerToDelete.name}**\n\nيمكنك الآن تحويل الإيموجي/الصورة مجدداً.`)
                             .setColor('#00FF00')
                             .setFooter({ text: language === 'english' ? 'Sticker removed from server.' : 'تم إزالة الملصق من الخادم.' });
                         await message.reply({ embeds: [embed] });
@@ -880,9 +930,24 @@ client.on('messageCreate', async message => {
                 const sticker = message.stickers.first();
                 const emojiName = conversionSession.emojiName;
                 const stickerUrl = sticker.url;
+                const stickerTrackingKey = `${message.guild.id}:${sticker.id}`;
+
+                if (convertedStickersToEmojis.has(stickerTrackingKey)) {
+                    const emojiInfo = convertedStickersToEmojis.get(stickerTrackingKey);
+                    const embed = new EmbedBuilder()
+                        .setTitle(language === 'english' ? '⚠️ Sticker Already Converted!' : '⚠️ تم تحويل هذا الملصق مسبقاً!')
+                        .setDescription(language === 'english' 
+                            ? `This sticker has already been converted to an emoji!\n\n**Existing Emoji Name:** ${emojiInfo.emojiName}\n\nDelete the emoji to convert again.`
+                            : `تم تحويل هذا الملصق إلى إيموجي مسبقاً!\n\n**اسم الإيموجي الموجود:** ${emojiInfo.emojiName}\n\nاحذف الإيموجي لتحويله مجدداً.`)
+                        .setColor('#FF9900')
+                        .setFooter({ text: language === 'english' ? 'This conversion is already done.' : 'تم إجراء هذا التحويل بالفعل.' });
+                    await message.reply({ embeds: [embed] });
+                    stickerToEmojiSessions.delete(repliedTo.id);
+                    return;
+                }
 
                 try {
-                    await message.guild.emojis.create({ attachment: stickerUrl, name: emojiName });
+                    const emoji = await message.guild.emojis.create({ attachment: stickerUrl, name: emojiName });
                     const embed = new EmbedBuilder()
                         .setTitle(language === 'english' ? '✅ Emoji Created!' : '✅ تم إنشاء الإيموجي!')
                         .setDescription(language === 'english' 
@@ -893,6 +958,11 @@ client.on('messageCreate', async message => {
                         .setFooter({ text: language === 'english' ? 'You can now use this emoji in your server!' : 'يمكنك الآن استخدام هذا الإيموجي في خادمك!' });
                     await message.reply({ embeds: [embed] });
                     stickerToEmojiSessions.delete(repliedTo.id);
+                    convertedStickersToEmojis.set(stickerTrackingKey, {
+                        emojiId: emoji.id,
+                        emojiName: emojiName,
+                        stickerId: sticker.id
+                    });
                 } catch (error) {
                     const errorMsg = error.code === 50138 ?
                         (language === 'english' ? 'Sticker must be under 256KB' : 'يجب أن يكون الملصق أقل من 256 كيلوبايت') :
