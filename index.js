@@ -46,16 +46,25 @@ function parseEmoji(emoji) {
 }
 
 function readServersFile() {
-    if (!fs.existsSync(SERVERS_FILE)) {
-        fs.writeFileSync(SERVERS_FILE, '[]');
+    try {
+        if (!fs.existsSync(SERVERS_FILE)) {
+            fs.writeFileSync(SERVERS_FILE, '[]');
+            return [];
+        }
+        const data = fs.readFileSync(SERVERS_FILE, 'utf8');
+        return JSON.parse(data);
+    } catch (error) {
+        console.error('⚠️ Warning: Could not read servers file:', error.message);
         return [];
     }
-    const data = fs.readFileSync(SERVERS_FILE, 'utf8');
-    return JSON.parse(data);
 }
 
 function writeServersFile(servers) {
-    fs.writeFileSync(SERVERS_FILE, JSON.stringify(servers, null, 2));
+    try {
+        fs.writeFileSync(SERVERS_FILE, JSON.stringify(servers, null, 2));
+    } catch (error) {
+        console.error('⚠️ Warning: Could not write servers file:', error.message);
+    }
 }
 
 client.once('ready', async () => {
@@ -303,8 +312,12 @@ client.on('interactionCreate', async interaction => {
                 .setFooter({ text: language === 'english' ? 'React ✅ to add or ❌ to cancel.' : 'تفاعل بـ ✅ للإضافة أو ❌ للإلغاء.' });
 
             const msg = await interaction.reply({ embeds: [embed], fetchReply: true });
-            await msg.react('✅');
-            await msg.react('❌');
+            try {
+                await msg.react('✅');
+                await msg.react('❌');
+            } catch (error) {
+                console.error('⚠️ Warning: Could not add reactions:', error.message);
+            }
 
             const filter = (reaction, user) => ['✅', '❌'].includes(reaction.emoji.name) && user.id === interaction.user.id;
             msg.awaitReactions({ filter, max: 1, time: 60000, errors: ['time'] })
@@ -313,7 +326,11 @@ client.on('interactionCreate', async interaction => {
                     if (reaction.emoji.name === '✅') {
                         for (const emoji of emojis) {
                             if (!interaction.guild.emojis.cache.find(e => e.name === emoji.name)) {
-                                await interaction.guild.emojis.create({ attachment: emoji.url, name: emoji.name });
+                                try {
+                                    await interaction.guild.emojis.create({ attachment: emoji.url, name: emoji.name });
+                                } catch (error) {
+                                    console.error(`⚠️ Warning: Could not add emoji ${emoji.name}:`, error.message);
+                                }
                             }
                         }
                         await interaction.followUp(language === 'english' ? '✅ Emojis added!' : '✅ تمت الإضافة!');
@@ -385,7 +402,14 @@ client.on('interactionCreate', async interaction => {
                 usedUrls[urlOption].push(interaction.guild.id);
                 await interaction.reply(language === 'english' ? '✅ Image converted!' : '✅ تم التحويل!');
             } catch (error) {
-                await interaction.reply(`❌ Error: ${error.message}`);
+                const errorMsg = error.code === 50138 ? 
+                    (language === 'english' ? 'Image must be under 256KB' : 'يجب أن تكون الصورة أقل من 256 كيلوبايت') :
+                    error.code === 50035 ?
+                    (language === 'english' ? 'Invalid request: ' : 'طلب غير صالح: ') + error.message :
+                    (language === 'english' ? 'Error: ' : 'خطأ: ') + error.message;
+                const embed = new EmbedBuilder().setDescription(`❌ ${errorMsg}`).setColor('#FF0000');
+                await interaction.reply({ embeds: [embed] });
+                console.error(`⚠️ Discord Error in image_to_emoji:`, error.code, error.message);
             }
         }
 
@@ -462,10 +486,16 @@ client.on('interactionCreate', async interaction => {
 
                 await interaction.reply({ embeds: [embed] });
             } catch (error) {
+                const errorMsg = error.code === 50045 ?
+                    (language === 'english' ? 'Emoji URL is invalid or unavailable' : 'رابط الإيموجي غير صالح أو غير متاح') :
+                    error.code === 50138 ?
+                    (language === 'english' ? 'File must be under 512KB' : 'يجب أن يكون الملف أقل من 512 كيلوبايت') :
+                    (language === 'english' ? 'Error: ' : 'خطأ: ') + error.message;
                 const embed = new EmbedBuilder()
-                    .setDescription(`❌ Error: ${error.message}`)
+                    .setDescription(`❌ ${errorMsg}`)
                     .setColor('#FF0000');
                 await interaction.reply({ embeds: [embed] });
+                console.error(`⚠️ Discord Error in emoji_to_sticker:`, error.code, error.message);
             }
         }
 
@@ -521,10 +551,18 @@ client.on('interactionCreate', async interaction => {
 
                 await interaction.reply({ embeds: [embed] });
             } catch (error) {
+                const errorMsg = error.code === 50045 ?
+                    (language === 'english' ? 'Image URL is invalid or unavailable' : 'رابط الصورة غير صالح أو غير متاح') :
+                    error.code === 50138 ?
+                    (language === 'english' ? 'File must be under 512KB' : 'يجب أن يكون الملف أقل من 512 كيلوبايت') :
+                    error.code === 50035 ?
+                    (language === 'english' ? 'Invalid request format' : 'صيغة الطلب غير صحيحة') :
+                    (language === 'english' ? 'Error: ' : 'خطأ: ') + error.message;
                 const embed = new EmbedBuilder()
-                    .setDescription(`❌ Error: ${error.message}`)
+                    .setDescription(`❌ ${errorMsg}`)
                     .setColor('#FF0000');
                 await interaction.reply({ embeds: [embed] });
+                console.error(`⚠️ Discord Error in image_to_sticker:`, error.code, error.message);
             }
         }
 
@@ -596,8 +634,12 @@ client.on('interactionCreate', async interaction => {
 
             const msg = await interaction.reply({ embeds: [embed], fetchReply: true });
 
-            await msg.react('🇺🇸');
-            await msg.react('<:Syria:1443915175379079208>');
+            try {
+                await msg.react('🇺🇸');
+                await msg.react('<:Syria:1443915175379079208>');
+            } catch (error) {
+                console.error('⚠️ Warning: Could not add language reactions:', error.message);
+            }
 
             const filter = (reaction, user) =>
                 (reaction.emoji.name === '🇺🇸' ||
@@ -649,8 +691,12 @@ client.on('interactionCreate', async interaction => {
                 const embed = new EmbedBuilder().setDescription(language === 'english' ? `✅ Emoji deleted!` : `✅ تم حذف الايموجي!`).setColor('#00FF00');
                 await interaction.reply({ embeds: [embed] });
             } catch (error) {
-                const embed = new EmbedBuilder().setDescription(`❌ Error: ${error.message}`).setColor('#FF0000');
+                const errorMsg = error.code === 50013 ?
+                    (language === 'english' ? 'Missing permissions to delete emoji' : 'لا توجد صلاحيات لحذف الإيموجي') :
+                    (language === 'english' ? 'Error: ' : 'خطأ: ') + error.message;
+                const embed = new EmbedBuilder().setDescription(`❌ ${errorMsg}`).setColor('#FF0000');
                 await interaction.reply({ embeds: [embed] });
+                console.error(`⚠️ Discord Error in delete_emoji:`, error.code, error.message);
             }
         }
 
@@ -685,8 +731,14 @@ client.on('interactionCreate', async interaction => {
                 const embed = new EmbedBuilder().setDescription(language === 'english' ? `✅ Renamed to ${newName}! ${emj}` : `✅ تم التغيير إلى ${newName}! ${emj}`).setColor('#00FF00');
                 await interaction.reply({ embeds: [embed] });
             } catch (error) {
-                const embed = new EmbedBuilder().setDescription(`❌ Error: ${error.message}`).setColor('#FF0000');
+                const errorMsg = error.code === 50013 ?
+                    (language === 'english' ? 'Missing permissions to rename emoji' : 'لا توجد صلاحيات لإعادة تسمية الإيموجي') :
+                    error.code === 50035 ?
+                    (language === 'english' ? 'Invalid emoji name' : 'اسم الإيموجي غير صالح') :
+                    (language === 'english' ? 'Error: ' : 'خطأ: ') + error.message;
+                const embed = new EmbedBuilder().setDescription(`❌ ${errorMsg}`).setColor('#FF0000');
                 await interaction.reply({ embeds: [embed] });
+                console.error(`⚠️ Discord Error in rename_emoji:`, error.code, error.message);
             }
         }
 
@@ -722,7 +774,7 @@ client.on('interactionCreate', async interaction => {
             }, 60000);
         }
     } catch (error) {
-        console.error('Error:', error);
+        console.error('⚠️ Discord Error in interaction handler:', error.code, error.message);
     }
 });
 
@@ -754,10 +806,14 @@ client.on('messageCreate', async message => {
                         await message.reply({ embeds: [embed] });
                         stickerDeletionSessions.delete(repliedTo.id);
                     } catch (error) {
+                        const errorMsg = error.code === 50013 ?
+                            (language === 'english' ? 'Missing permissions to delete sticker' : 'لا توجد صلاحيات لحذف الملصق') :
+                            (language === 'english' ? 'Error: ' : 'خطأ: ') + error.message;
                         const embed = new EmbedBuilder()
-                            .setDescription(`❌ Error: ${error.message}`)
+                            .setDescription(`❌ ${errorMsg}`)
                             .setColor('#FF0000');
                         await message.reply({ embeds: [embed] });
+                        console.error(`⚠️ Discord Error in sticker deletion:`, error.code, error.message);
                     }
                 } else {
                     const embed = new EmbedBuilder()
@@ -862,7 +918,11 @@ You can delete a sticker using this slash command **/delete_sticker** and then r
         if (suggestedEmojis.length > 0) {
             for (const emoji of suggestedEmojis) {
                 if (!message.guild.emojis.cache.find(e => e.name === emoji.name)) {
-                    await message.guild.emojis.create({ attachment: emoji.url, name: emoji.name });
+                    try {
+                        await message.guild.emojis.create({ attachment: emoji.url, name: emoji.name });
+                    } catch (error) {
+                        console.error(`⚠️ Warning: Could not add emoji ${emoji.name}:`, error.message);
+                    }
                 }
             }
             message.channel.send(language === 'english' 
@@ -890,6 +950,15 @@ app.listen(PORT, () => {
 });
 
 client.login(process.env.token).catch(err => {
-    console.error('❌ Failed to login:', err);
+    console.error('❌ Failed to login:', err.message);
     console.error('تأكد من إضافة token في Replit Secrets!');
+});
+
+// Global error handlers
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('⚠️ Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
+process.on('uncaughtException', (error) => {
+    console.error('⚠️ Uncaught Exception:', error.message);
 });
