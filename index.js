@@ -507,7 +507,8 @@ client.on('interactionCreate', async interaction => {
                     guild.emojis.cache.forEach(emoji => {
                         if (emoji.name.toLowerCase().includes(searchTerm)) {
                             const isDuplicate = foundEmojis.find(e => e.id === emoji.id);
-                            if (!isDuplicate) {
+                            const alreadyInServer = interaction.guild.emojis.cache.find(e => e.name === emoji.name);
+                            if (!isDuplicate && !alreadyInServer) {
                                 foundEmojis.push(emoji);
                             }
                         }
@@ -542,56 +543,57 @@ client.on('interactionCreate', async interaction => {
                     groupedByName[emoji.name].push(emoji);
                 });
 
+                let description = '';
                 const rows = [];
-                let selectMenuCount = 0;
-                const emojiNames = Object.keys(groupedByName).slice(0, 4);
+                let buttonIndex = 0;
 
-                emojiNames.forEach(name => {
+                Object.keys(groupedByName).forEach(name => {
                     const emojiList = groupedByName[name].slice(0, 10);
-                    const selectMenu = new StringSelectMenuBuilder()
-                        .setCustomId(`emoji_select_${selectMenuCount}`)
-                        .setPlaceholder(`Select ${name} emoji${emojiList.length > 1 ? 's' : ''}`)
-                        .setMinValues(1)
-                        .setMaxValues(Math.min(emojiList.length, 5));
+                    description += `**${name}** (${emojiList.length} variant${emojiList.length > 1 ? 's' : ''}):\n`;
 
                     emojiList.forEach((emoji, idx) => {
-                        selectMenu.addOptions({
-                            label: `${emoji.name} - ${emoji.guild.name}`,
-                            value: emoji.id,
-                            emoji: emoji
-                        });
+                        description += `${idx + 1}️⃣ ${emoji} • ${emoji.guild.name}\n`;
                     });
+                    description += '\n';
 
-                    const row = new ActionRowBuilder().addComponents(selectMenu);
-                    rows.push(row);
-                    selectMenuCount++;
+                    let currentRow = null;
+                    emojiList.forEach((emoji, idx) => {
+                        if (buttonIndex % 5 === 0) {
+                            currentRow = new ActionRowBuilder();
+                            rows.push(currentRow);
+                        }
+
+                        const button = new ButtonBuilder()
+                            .setCustomId(`emoji_btn_${buttonIndex}`)
+                            .setLabel(`${idx + 1}`)
+                            .setStyle(ButtonStyle.Primary)
+                            .setEmoji(emoji);
+
+                        currentRow.addComponents(button);
+                        buttonIndex++;
+                    });
                 });
 
-                const searchAgainButton = new ButtonBuilder()
-                    .setCustomId('emoji_search_again')
-                    .setLabel(await t('Search Again', langCode))
-                    .setStyle(ButtonStyle.Primary)
-                    .setEmoji('🔍');
+                const doneButton = new ButtonBuilder()
+                    .setCustomId('emoji_search_done')
+                    .setLabel(await t('Done', langCode))
+                    .setStyle(ButtonStyle.Success)
+                    .setEmoji('✅');
 
                 const cancelButton = new ButtonBuilder()
                     .setCustomId('emoji_search_cancel')
                     .setLabel(await t('Cancel', langCode))
-                    .setStyle(ButtonStyle.Secondary)
+                    .setStyle(ButtonStyle.Danger)
                     .setEmoji('❌');
 
-                const buttonRow = new ActionRowBuilder().addComponents(searchAgainButton, cancelButton);
-                rows.push(buttonRow);
+                const actionRow = new ActionRowBuilder().addComponents(doneButton, cancelButton);
+                rows.push(actionRow);
 
                 const embed = new EmbedBuilder()
                     .setTitle('🔍 ' + await t('Emoji Search Results', langCode))
-                    .setDescription(await t('Found', langCode) + ` **${emojis.length}** ${await t('unique emojis', langCode)}`)
-                    .addFields(
-                        { name: await t('Search Term', langCode), value: `\`${searchTerm}\``, inline: true },
-                        { name: await t('Total Results', langCode), value: `${emojis.length}`, inline: true },
-                        { name: await t('Instructions', langCode), value: await t('Select emojis from dropdowns to add them. Click "Search Again" to search for different emojis.', langCode), inline: false }
-                    )
+                    .setDescription(description)
                     .setColor('#00FFFF')
-                    .setFooter({ text: await t('This search will expire after 5 minutes of inactivity.', langCode) });
+                    .setFooter({ text: await t('Click a button to add an emoji. 2-minute timeout.', langCode) });
 
                 const msg = await interaction.reply({ embeds: [embed], components: rows, fetchReply: true });
                 
@@ -604,117 +606,60 @@ client.on('interactionCreate', async interaction => {
 
             if (foundEmojis.length === 0) return;
 
-            const filter = i => (i.customId.startsWith('emoji_select_') || i.customId === 'emoji_search_again' || i.customId === 'emoji_search_cancel') && i.user.id === interaction.user.id;
-            const collector = msg.createMessageComponentCollector({ filter, time: 300000 });
+            const emojiMap = new Map();
+            let buttonIndex = 0;
+            const groupedByName = {};
+            foundEmojis.forEach(emoji => {
+                if (!groupedByName[emoji.name]) {
+                    groupedByName[emoji.name] = [];
+                }
+                groupedByName[emoji.name].push(emoji);
+            });
+
+            Object.keys(groupedByName).forEach(name => {
+                const emojiList = groupedByName[name].slice(0, 10);
+                emojiList.forEach((emoji, idx) => {
+                    emojiMap.set(`emoji_btn_${buttonIndex}`, emoji);
+                    buttonIndex++;
+                });
+            });
+
+            const filter = i => (i.customId.startsWith('emoji_btn_') || i.customId === 'emoji_search_done' || i.customId === 'emoji_search_cancel') && i.user.id === interaction.user.id;
+            const collector = msg.createMessageComponentCollector({ filter, time: 120000 });
             const selectedEmojis = new Set();
 
             collector.on('collect', async i => {
-                if (i.customId === 'emoji_search_again') {
-                    await i.showModal(
-                        new ModalBuilder()
-                            .setCustomId('emoji_search_modal')
-                            .setTitle(await t('Search for Emojis', langCode))
-                            .addComponents(
-                                new ActionRowBuilder().addComponents(
-                                    new TextInputBuilder()
-                                        .setCustomId('search_input')
-                                        .setLabel(await t('Emoji Name', langCode))
-                                        .setStyle(TextInputStyle.Short)
-                                        .setPlaceholder('e.g., smile, fire, heart')
-                                )
-                            )
-                    );
-
-                    const submitted = await i.awaitModalSubmit({ time: 60000 }).catch(() => null);
-                    if (!submitted) return;
-
-                    await submitted.deferUpdate();
-                    const newSearchTerm = submitted.fields.getTextInputValue('search_input').toLowerCase();
-                    const newFoundEmojis = await performSearch(newSearchTerm);
-                    
-                    if (newFoundEmojis.length === 0) {
+                if (i.customId.startsWith('emoji_btn_')) {
+                    await i.deferUpdate();
+                    const emoji = emojiMap.get(i.customId);
+                    if (emoji) {
+                        selectedEmojis.add(emoji.id);
+                        const list = Array.from(selectedEmojis).map(id => {
+                            const e = client.emojis.cache.get(id);
+                            return e ? e.toString() : '❓';
+                        }).join(' ');
+                        
                         const embed = new EmbedBuilder()
-                            .setTitle('❌ ' + await t('Nothing Available', langCode))
-                            .setDescription(await t('No additional emojis found for:', langCode) + ` **${newSearchTerm}**`)
-                            .setColor('#FF0000')
-                            .setFooter({ text: await t('Try a different search term.', langCode) });
-                        await submitted.editReply({ embeds: [embed], components: [] });
+                            .setTitle('📝 ' + await t('Current Selection', langCode))
+                            .setDescription(list)
+                            .setColor('#FFA500')
+                            .addFields({ name: await t('Selected', langCode), value: `${selectedEmojis.size}`, inline: true })
+                            .setFooter({ text: await t('Click "Done" to add selected emojis.', langCode) });
+                        
+                        await i.editReply({ embeds: [embed] });
+                    }
+                } else if (i.customId === 'emoji_search_done') {
+                    await i.deferUpdate();
+                    if (selectedEmojis.size === 0) {
+                        const embed = new EmbedBuilder()
+                            .setTitle('❌ ' + await t('No Selection', langCode))
+                            .setDescription(await t('Please select at least one emoji.', langCode))
+                            .setColor('#FF0000');
+                        await i.editReply({ embeds: [embed] });
                         return;
                     }
 
-                    const groupedByName = {};
-                    newFoundEmojis.forEach(emoji => {
-                        if (!groupedByName[emoji.name]) {
-                            groupedByName[emoji.name] = [];
-                        }
-                        groupedByName[emoji.name].push(emoji);
-                    });
-
-                    const newRows = [];
-                    let selectMenuCount = 0;
-                    const newEmojiNames = Object.keys(groupedByName).slice(0, 4);
-
-                    newEmojiNames.forEach(name => {
-                        const emojiList = groupedByName[name].slice(0, 10);
-                        const selectMenu = new StringSelectMenuBuilder()
-                            .setCustomId(`emoji_select_${selectMenuCount}`)
-                            .setPlaceholder(`Select ${name} emoji${emojiList.length > 1 ? 's' : ''}`)
-                            .setMinValues(1)
-                            .setMaxValues(Math.min(emojiList.length, 5));
-
-                        emojiList.forEach((emoji, idx) => {
-                            selectMenu.addOptions({
-                                label: `${emoji.name} - ${emoji.guild.name}`,
-                                value: emoji.id,
-                                emoji: emoji
-                            });
-                        });
-
-                        const row = new ActionRowBuilder().addComponents(selectMenu);
-                        newRows.push(row);
-                        selectMenuCount++;
-                    });
-
-                    const newSearchAgainButton = new ButtonBuilder()
-                        .setCustomId('emoji_search_again')
-                        .setLabel(await t('Search Again', langCode))
-                        .setStyle(ButtonStyle.Primary)
-                        .setEmoji('🔍');
-
-                    const newCancelButton = new ButtonBuilder()
-                        .setCustomId('emoji_search_cancel')
-                        .setLabel(await t('Cancel', langCode))
-                        .setStyle(ButtonStyle.Secondary)
-                        .setEmoji('❌');
-
-                    const newButtonRow = new ActionRowBuilder().addComponents(newSearchAgainButton, newCancelButton);
-                    newRows.push(newButtonRow);
-
-                    const newEmbed = new EmbedBuilder()
-                        .setTitle('🔍 ' + await t('Emoji Search Results', langCode))
-                        .setDescription(await t('Found', langCode) + ` **${newFoundEmojis.length}** ${await t('unique emojis', langCode)}`)
-                        .addFields(
-                            { name: await t('Search Term', langCode), value: `\`${newSearchTerm}\``, inline: true },
-                            { name: await t('Total Results', langCode), value: `${newFoundEmojis.length}`, inline: true },
-                            { name: await t('Instructions', langCode), value: await t('Select emojis from dropdowns to add them. Click "Search Again" to search for different emojis.', langCode), inline: false }
-                        )
-                        .setColor('#00FFFF')
-                        .setFooter({ text: await t('This search will expire after 5 minutes of inactivity.', langCode) });
-
-                    await submitted.editReply({ embeds: [newEmbed], components: newRows });
-                } else if (i.customId === 'emoji_search_cancel') {
-                    await i.deferUpdate();
-                    const embed = new EmbedBuilder()
-                        .setTitle('❌ ' + await t('Search Cancelled', langCode))
-                        .setDescription(await t('No emojis were added.', langCode))
-                        .setColor('#FF0000');
-                    await i.editReply({ embeds: [embed], components: [] });
-                    collector.stop();
-                } else if (i.customId === 'emoji_confirm_add') {
-                    await i.deferUpdate();
                     let addedCount = 0;
-                    const failedEmojis = [];
-
                     for (const emojiId of selectedEmojis) {
                         const emoji = client.emojis.cache.get(emojiId);
                         if (emoji && !interaction.guild.emojis.cache.find(e => e.name === emoji.name)) {
@@ -722,76 +667,34 @@ client.on('interactionCreate', async interaction => {
                                 await interaction.guild.emojis.create({ attachment: emoji.url, name: emoji.name });
                                 addedCount++;
                             } catch (error) {
-                                failedEmojis.push(emoji.name);
                                 console.error(`⚠️ Warning: Could not add emoji ${emoji.name}:`, error.message);
                             }
                         }
                     }
 
-                    const resultEmbed = new EmbedBuilder()
-                        .setTitle('✅ ' + await t('Operation Complete', langCode))
-                        .setDescription(await t('Successfully added', langCode) + ` **${addedCount}** ${await t('emojis', langCode)}`)
-                        .setColor(failedEmojis.length === 0 ? '#00FF00' : '#FFA500');
-
-                    if (failedEmojis.length > 0) {
-                        resultEmbed.addFields({ name: await t('Failed', langCode), value: failedEmojis.join(', ') });
-                    }
-
-                    await i.editReply({ embeds: [resultEmbed], components: [] });
-                    collector.stop();
-                } else if (i.customId === 'emoji_clear_selection') {
-                    await i.deferUpdate();
-                    selectedEmojis.clear();
-
                     const embed = new EmbedBuilder()
-                        .setTitle('🧹 ' + await t('Selection Cleared', langCode))
-                        .setDescription(await t('All selected emojis have been cleared. You can select again.', langCode))
-                        .setColor('#FFA500');
-
+                        .setTitle('✅ ' + await t('Complete', langCode))
+                        .setDescription(await t('Added', langCode) + ` **${addedCount}** ${await t('emojis', langCode)}!`)
+                        .setColor('#00FF00');
+                    
                     await i.editReply({ embeds: [embed], components: [] });
-                } else if (i.customId.startsWith('emoji_select_')) {
+                    collector.stop();
+                } else if (i.customId === 'emoji_search_cancel') {
                     await i.deferUpdate();
-                    const selectedIds = i.values;
-                    selectedIds.forEach(id => selectedEmojis.add(id));
-
-                    const confirmButton = new ButtonBuilder()
-                        .setCustomId('emoji_confirm_add')
-                        .setLabel(await t('Add Selected', langCode))
-                        .setStyle(ButtonStyle.Success)
-                        .setEmoji('✅');
-
-                    const clearButton = new ButtonBuilder()
-                        .setCustomId('emoji_clear_selection')
-                        .setLabel(await t('Clear Selection', langCode))
-                        .setStyle(ButtonStyle.Danger)
-                        .setEmoji('🗑️');
-
-                    const confirmRow = new ActionRowBuilder().addComponents(confirmButton, clearButton);
-
-                    const statusEmbed = new EmbedBuilder()
-                        .setTitle('📋 ' + await t('Selection Preview', langCode))
-                        .setDescription(await t('Selected emojis', langCode) + `:\n${Array.from(selectedEmojis).map(id => {
-                            const emoji = client.emojis.cache.get(id);
-                            return emoji ? emoji.toString() : '❓';
-                        }).join(' ')}`)
-                        .setColor('#FFA500')
-                        .addFields(
-                            { name: await t('Total Selected', langCode), value: `${selectedEmojis.size}`, inline: true }
-                        )
-                        .setFooter({ text: await t('Continue selecting emojis or click "Add Selected" to confirm.', langCode) });
-
-                    await i.editReply({ embeds: [statusEmbed], components: [confirmRow] });
+                    const embed = new EmbedBuilder()
+                        .setTitle('❌ ' + await t('Cancelled', langCode))
+                        .setColor('#FF0000');
+                    await i.editReply({ embeds: [embed], components: [] });
+                    collector.stop();
                 }
             });
 
             collector.on('end', async (collected, reason) => {
                 if (reason === 'time') {
                     const embed = new EmbedBuilder()
-                        .setTitle('⏳ ' + await t('Search Expired', langCode))
-                        .setDescription(await t('Your emoji search session has expired due to inactivity.', langCode))
-                        .setColor('#FF0000')
-                        .setFooter({ text: await t('Use /emoji_search to start a new search.', langCode) });
-
+                        .setTitle('⏳ ' + await t('Timeout', langCode))
+                        .setDescription(await t('Search session expired.', langCode))
+                        .setColor('#FF0000');
                     try {
                         await interaction.editReply({ embeds: [embed], components: [] });
                     } catch (error) {
@@ -812,7 +715,9 @@ client.on('interactionCreate', async interaction => {
             client.guilds.cache.forEach(guild => {
                 if (allowedServers.get(guild.id) === true) {
                     guild.emojis.cache.forEach(emoji => {
-                        if (!emojis.includes(emoji) && !interaction.guild.emojis.cache.find(e => e.name === emoji.name)) {
+                        const isDuplicate = emojis.find(e => e.id === emoji.id);
+                        const alreadyInServer = interaction.guild.emojis.cache.find(e => e.name === emoji.name);
+                        if (!isDuplicate && !alreadyInServer) {
                             emojis.push(emoji);
                         }
                     });
