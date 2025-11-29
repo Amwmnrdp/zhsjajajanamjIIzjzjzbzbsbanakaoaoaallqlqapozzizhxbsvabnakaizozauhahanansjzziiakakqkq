@@ -10,7 +10,10 @@ const {
     ButtonStyle, 
     ApplicationCommandOptionType, 
     PermissionsBitField,
-    StringSelectMenuBuilder
+    StringSelectMenuBuilder,
+    ModalBuilder,
+    TextInputBuilder,
+    TextInputStyle
 } = require('discord.js');
 const isImageUrl = require('is-image-url');
 const translate = require('google-translate-api-x');
@@ -605,8 +608,6 @@ client.on('interactionCreate', async interaction => {
             const selectedEmojis = new Set();
 
             collector.on('collect', async i => {
-                await i.deferUpdate();
-
                 if (i.customId === 'emoji_search_again') {
                     await i.showModal(
                         new ModalBuilder()
@@ -700,48 +701,14 @@ client.on('interactionCreate', async interaction => {
 
                     await submitted.editReply({ embeds: [newEmbed], components: newRows });
                 } else if (i.customId === 'emoji_search_cancel') {
+                    await i.deferUpdate();
                     const embed = new EmbedBuilder()
                         .setTitle('❌ ' + await t('Search Cancelled', langCode))
                         .setDescription(await t('No emojis were added.', langCode))
                         .setColor('#FF0000');
                     await i.editReply({ embeds: [embed], components: [] });
                     collector.stop();
-                } else if (i.customId.startsWith('emoji_select_')) {
-                    const selectedIds = i.values;
-                    selectedIds.forEach(id => selectedEmojis.add(id));
-
-                    const confirmButton = new ButtonBuilder()
-                        .setCustomId('emoji_confirm_add')
-                        .setLabel(await t('Add Selected', langCode))
-                        .setStyle(ButtonStyle.Success)
-                        .setEmoji('✅');
-
-                    const clearButton = new ButtonBuilder()
-                        .setCustomId('emoji_clear_selection')
-                        .setLabel(await t('Clear Selection', langCode))
-                        .setStyle(ButtonStyle.Danger)
-                        .setEmoji('🗑️');
-
-                    const confirmRow = new ActionRowBuilder().addComponents(confirmButton, clearButton);
-
-                    const statusEmbed = new EmbedBuilder()
-                        .setTitle('📋 ' + await t('Selection Preview', langCode))
-                        .setDescription(await t('Selected emojis', langCode) + `:\n${Array.from(selectedEmojis).map(id => {
-                            const emoji = client.emojis.cache.get(id);
-                            return emoji ? emoji.toString() : '❓';
-                        }).join(' ')}`)
-                        .setColor('#FFA500')
-                        .addFields(
-                            { name: await t('Total Selected', langCode), value: `${selectedEmojis.size}`, inline: true }
-                        )
-                        .setFooter({ text: await t('Continue selecting emojis or click "Add Selected" to confirm.', langCode) });
-
-                    await i.editReply({ embeds: [statusEmbed], components: [confirmRow] });
-                }
-            });
-
-            collector.on('collect', async i => {
-                if (i.customId === 'emoji_confirm_add') {
+                } else if (i.customId === 'emoji_confirm_add') {
                     await i.deferUpdate();
                     let addedCount = 0;
                     const failedEmojis = [];
@@ -780,6 +747,38 @@ client.on('interactionCreate', async interaction => {
                         .setColor('#FFA500');
 
                     await i.editReply({ embeds: [embed], components: [] });
+                } else if (i.customId.startsWith('emoji_select_')) {
+                    await i.deferUpdate();
+                    const selectedIds = i.values;
+                    selectedIds.forEach(id => selectedEmojis.add(id));
+
+                    const confirmButton = new ButtonBuilder()
+                        .setCustomId('emoji_confirm_add')
+                        .setLabel(await t('Add Selected', langCode))
+                        .setStyle(ButtonStyle.Success)
+                        .setEmoji('✅');
+
+                    const clearButton = new ButtonBuilder()
+                        .setCustomId('emoji_clear_selection')
+                        .setLabel(await t('Clear Selection', langCode))
+                        .setStyle(ButtonStyle.Danger)
+                        .setEmoji('🗑️');
+
+                    const confirmRow = new ActionRowBuilder().addComponents(confirmButton, clearButton);
+
+                    const statusEmbed = new EmbedBuilder()
+                        .setTitle('📋 ' + await t('Selection Preview', langCode))
+                        .setDescription(await t('Selected emojis', langCode) + `:\n${Array.from(selectedEmojis).map(id => {
+                            const emoji = client.emojis.cache.get(id);
+                            return emoji ? emoji.toString() : '❓';
+                        }).join(' ')}`)
+                        .setColor('#FFA500')
+                        .addFields(
+                            { name: await t('Total Selected', langCode), value: `${selectedEmojis.size}`, inline: true }
+                        )
+                        .setFooter({ text: await t('Continue selecting emojis or click "Add Selected" to confirm.', langCode) });
+
+                    await i.editReply({ embeds: [statusEmbed], components: [confirmRow] });
                 }
             });
 
