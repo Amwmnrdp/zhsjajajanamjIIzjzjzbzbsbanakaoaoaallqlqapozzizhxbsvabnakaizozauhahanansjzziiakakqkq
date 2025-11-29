@@ -544,8 +544,9 @@ client.on('interactionCreate', async interaction => {
 
                 const rows = [];
                 let selectMenuCount = 0;
+                const emojiNames = Object.keys(groupedByName).slice(0, 4);
 
-                Object.keys(groupedByName).forEach(name => {
+                emojiNames.forEach(name => {
                     const emojiList = groupedByName[name].slice(0, 10);
                     const selectMenu = new StringSelectMenuBuilder()
                         .setCustomId(`emoji_select_${selectMenuCount}`)
@@ -651,8 +652,9 @@ client.on('interactionCreate', async interaction => {
 
                     const newRows = [];
                     let selectMenuCount = 0;
+                    const newEmojiNames = Object.keys(groupedByName).slice(0, 4);
 
-                    Object.keys(groupedByName).forEach(name => {
+                    newEmojiNames.forEach(name => {
                         const emojiList = groupedByName[name].slice(0, 10);
                         const selectMenu = new StringSelectMenuBuilder()
                             .setCustomId(`emoji_select_${selectMenuCount}`)
