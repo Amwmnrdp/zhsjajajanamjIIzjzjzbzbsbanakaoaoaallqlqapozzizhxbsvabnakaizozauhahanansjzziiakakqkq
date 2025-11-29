@@ -33,6 +33,7 @@ const usedUrls = {};
 let suggestedEmojis = [];
 const stickerDeletionSessions = new Map();
 const stickerToEmojiSessions = new Map();
+const stickerRenameSessions = new Map();
 const convertedEmojisToStickers = new Map();
 const convertedImagesToStickers = new Map();
 const convertedStickersToEmojis = new Map();
@@ -344,6 +345,18 @@ client.once('ready', async () => {
             {
                 name: 'delete_sticker',
                 description: 'Delete a sticker'
+            },
+            {
+                name: 'rename_sticker',
+                description: 'Rename a sticker',
+                options: [
+                    {
+                        name: 'name',
+                        type: ApplicationCommandOptionType.String,
+                        description: 'New sticker name',
+                        required: true
+                    }
+                ]
             },
             {
                 name: 'sticker_to_emoji',
@@ -987,6 +1000,39 @@ client.on('interactionCreate', async interaction => {
             }, 60000);
         }
 
+        if (interaction.commandName === 'rename_sticker') {
+            if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageEmojisAndStickers)) {
+                const embed = new EmbedBuilder().setDescription('❌ ' + await t('Need permission!', langCode)).setColor('#FF0000');
+                await interaction.reply({ embeds: [embed], ephemeral: true });
+                return;
+            }
+
+            const newName = interaction.options.getString('name');
+
+            const embed = new EmbedBuilder()
+                .setTitle('📌 ' + await t('Send or Reply with Sticker', langCode))
+                .setDescription(await t('Reply to this message using the sticker you want to rename.', langCode) + `\n\n**${await t('New Name:', langCode)}** ${newName}`)
+                .setColor('#00FFFF')
+                .setFooter({ text: await t('Waiting for your sticker...', langCode) });
+
+            const msg = await interaction.reply({ embeds: [embed], fetchReply: true });
+            
+            stickerRenameSessions.set(msg.id, {
+                guildId: interaction.guild.id,
+                userId: interaction.user.id,
+                langCode: langCode,
+                messageId: msg.id,
+                channelId: msg.channel.id,
+                newName: newName
+            });
+
+            setTimeout(() => {
+                if (stickerRenameSessions.has(msg.id)) {
+                    stickerRenameSessions.delete(msg.id);
+                }
+            }, 60000);
+        }
+
         if (interaction.commandName === 'sticker_to_emoji') {
             if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageEmojisAndStickers)) {
                 const embed = new EmbedBuilder().setDescription('❌ ' + await t('Need permission!', langCode)).setColor('#FF0000');
@@ -1033,6 +1079,7 @@ client.on('messageCreate', async message => {
             const repliedTo = await message.channel.messages.fetch(message.reference.messageId);
             const deletionSession = stickerDeletionSessions.get(repliedTo.id);
             const conversionSession = stickerToEmojiSessions.get(repliedTo.id);
+            const renameSession = stickerRenameSessions.get(repliedTo.id);
             
             if (deletionSession && deletionSession.userId === message.author.id && deletionSession.guildId === message.guild.id) {
                 const sessionLang = deletionSession.langCode || 'en';
@@ -1128,6 +1175,43 @@ client.on('messageCreate', async message => {
                         .setColor('#FF0000');
                     await message.reply({ embeds: [embed] });
                     console.error(`⚠️ Discord Error in sticker to emoji conversion:`, error.code, error.message);
+                }
+            }
+
+            if (renameSession && renameSession.userId === message.author.id && renameSession.guildId === message.guild.id) {
+                const sessionLang = renameSession.langCode || 'en';
+                const sticker = message.stickers.first();
+                const newName = renameSession.newName;
+                const serverStickers = message.guild.stickers.cache;
+                const stickerToRename = serverStickers.find(s => s.id === sticker.id);
+
+                if (stickerToRename) {
+                    try {
+                        await stickerToRename.edit({ name: newName });
+                        const embed = new EmbedBuilder()
+                            .setTitle('✅ ' + await t('Sticker Renamed!', sessionLang))
+                            .setDescription(await t('Successfully renamed sticker to:', sessionLang) + ` **${newName}**`)
+                            .setColor('#00FF00')
+                            .setFooter({ text: await t('Sticker name updated.', sessionLang) });
+                        await message.reply({ embeds: [embed] });
+                        stickerRenameSessions.delete(repliedTo.id);
+                    } catch (error) {
+                        const errorMsg = error.code === 50013 ?
+                            await t('Missing permissions to rename sticker', sessionLang) :
+                            error.code === 50035 ?
+                            await t('Invalid sticker name', sessionLang) :
+                            await t('Error:', sessionLang) + ' ' + error.message;
+                        const embed = new EmbedBuilder()
+                            .setDescription(`❌ ${errorMsg}`)
+                            .setColor('#FF0000');
+                        await message.reply({ embeds: [embed] });
+                        console.error(`⚠️ Discord Error in sticker rename:`, error.code, error.message);
+                    }
+                } else {
+                    const embed = new EmbedBuilder()
+                        .setDescription('❌ ' + await t('Sticker not found in this server!', sessionLang))
+                        .setColor('#FF0000');
+                    await message.reply({ embeds: [embed] });
                 }
             }
         } catch (error) {
