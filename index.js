@@ -504,17 +504,17 @@ client.on('interactionCreate', async interaction => {
                 let foundEmojis = [];
 
                 client.guilds.cache.forEach(guild => {
-                    if (allowedServers.get(guild.id) === true) {
-                        guild.emojis.cache.forEach(emoji => {
-                            if (emoji.name.toLowerCase().includes(searchTerm) && 
-                                !foundEmojis.find(e => e.id === emoji.id) &&
-                                !interaction.guild.emojis.cache.find(e => e.name === emoji.name)) {
+                    guild.emojis.cache.forEach(emoji => {
+                        if (emoji.name.toLowerCase().includes(searchTerm)) {
+                            const isDuplicate = foundEmojis.find(e => e.id === emoji.id);
+                            if (!isDuplicate) {
                                 foundEmojis.push(emoji);
                             }
-                        });
-                    }
+                        }
+                    });
                 });
 
+                console.log(`🔍 Search: "${searchTerm}" | Total found: ${foundEmojis.length}`);
                 return foundEmojis;
             };
 
