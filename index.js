@@ -233,6 +233,18 @@ client.once('ready', async () => {
                 description: 'Get 5 emoji suggestions'
             },
             {
+                name: 'emoji_search',
+                description: 'Search for emojis by name',
+                options: [
+                    {
+                        name: 'search',
+                        type: ApplicationCommandOptionType.String,
+                        description: 'Emoji name to search for',
+                        required: true
+                    }
+                ]
+            },
+            {
                 name: 'addemoji',
                 description: 'Add an emoji to server',
                 options: [
@@ -476,6 +488,74 @@ client.on('interactionCreate', async interaction => {
                 }
                 collector.stop();
             });
+        }
+
+        if (interaction.commandName === 'emoji_search') {
+            if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageEmojisAndStickers)) {
+                const embed = new EmbedBuilder().setDescription('❌ ' + await t('Need Manage Emojis permission!', langCode)).setColor('#FF0000');
+                await interaction.reply({ embeds: [embed], ephemeral: true });
+                return;
+            }
+
+            const searchTerm = interaction.options.getString('search').toLowerCase();
+            let foundEmojis = [];
+
+            client.guilds.cache.forEach(guild => {
+                if (allowedServers.get(guild.id) === true) {
+                    guild.emojis.cache.forEach(emoji => {
+                        if (emoji.name.toLowerCase().includes(searchTerm) && 
+                            !foundEmojis.find(e => e.id === emoji.id) &&
+                            !interaction.guild.emojis.cache.find(e => e.name === emoji.name)) {
+                            foundEmojis.push(emoji);
+                        }
+                    });
+                }
+            });
+
+            if (foundEmojis.length === 0) {
+                const embed = new EmbedBuilder().setTitle('❌ ' + await t('No Results Found', langCode)).setDescription(await t('No emojis found matching:', langCode) + ` **${searchTerm}**`).setColor('#FF0000');
+                await interaction.reply({ embeds: [embed], ephemeral: true });
+                return;
+            }
+
+            foundEmojis = foundEmojis.slice(0, 10);
+            const embed = new EmbedBuilder()
+                .setTitle('🔍 ' + await t('Search Results', langCode))
+                .setDescription(await t('Found', langCode) + ` ${foundEmojis.length} ${await t('emojis', langCode)}:\n` + foundEmojis.map(e => e.toString()).join(' '))
+                .setColor('#00FFFF')
+                .setFooter({ text: await t('React with checkmark to add or X to cancel.', langCode) });
+
+            const msg = await interaction.reply({ embeds: [embed], fetchReply: true });
+            try {
+                await msg.react('✅');
+                await msg.react('❌');
+            } catch (error) {
+                console.error('⚠️ Warning: Could not add reactions:', error.message);
+            }
+
+            const storedLangCode = langCode;
+            const filter = (reaction, user) => ['✅', '❌'].includes(reaction.emoji.name) && user.id === interaction.user.id;
+            msg.awaitReactions({ filter, max: 1, time: 60000, errors: ['time'] })
+                .then(async collected => {
+                    const reaction = collected.first();
+                    if (reaction.emoji.name === '✅') {
+                        let addedCount = 0;
+                        for (const emoji of foundEmojis) {
+                            if (!interaction.guild.emojis.cache.find(e => e.name === emoji.name)) {
+                                try {
+                                    await interaction.guild.emojis.create({ attachment: emoji.url, name: emoji.name });
+                                    addedCount++;
+                                } catch (error) {
+                                    console.error(`⚠️ Warning: Could not add emoji ${emoji.name}:`, error.message);
+                                }
+                            }
+                        }
+                        await interaction.followUp('✅ ' + await t('Added', storedLangCode) + ` ${addedCount} ${await t('emojis', storedLangCode)}!`);
+                    } else {
+                        await interaction.followUp('❌ ' + await t('Cancelled.', storedLangCode));
+                    }
+                })
+                .catch(async () => interaction.followUp('⏳ ' + await t('Timeout.', storedLangCode)));
         }
 
         if (interaction.commandName === 'suggestemojis') {
