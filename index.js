@@ -1,6 +1,10 @@
 const express = require('express');
+const path = require('path');
 const app = express();
 const { Client, GatewayIntentBits, EmbedBuilder, PermissionsBitField } = require('discord.js');
+
+// Serve static files from public directory
+app.use(express.static(path.join(__dirname, 'public')));
 
 // Import utilities
 const { SUPPORTED_LANGUAGES, COMMAND_DEFINITIONS } = require('./src/utils/constants');
@@ -386,8 +390,14 @@ ${await t('You can convert a sticker to an emoji using this slash command', lang
     }
 });
 
+// Serve dashboard
 app.get('/', (req, res) => {
-    res.send('✅ ProEmoji Bot is Running!');
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// API health check
+app.get('/health', (req, res) => {
+    res.json({ status: 'online', bot: 'ProEmoji' });
 });
 
 const PORT = 3000;

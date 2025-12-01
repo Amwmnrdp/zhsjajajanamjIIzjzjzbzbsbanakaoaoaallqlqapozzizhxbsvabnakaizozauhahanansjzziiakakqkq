@@ -10,13 +10,14 @@ Preferred communication style: Simple, everyday language.
 
 ## Core Application Structure
 
-**Problem**: Need a reliable Discord bot that can run continuously and provide web health checks with clean, modular code.
+**Problem**: Need a reliable Discord bot that can run continuously with a web dashboard and health checks with clean, modular code.
 
-**Solution**: Combined Discord.js client with Express web server, organized into separate utility modules for maintainability.
+**Solution**: Combined Discord.js client with Express web server (serving HTML dashboard), organized into separate utility modules for maintainability.
 
 **Rationale**: 
 - Express server provides HTTP endpoint for health monitoring and uptime tracking
 - Discord.js client handles all bot functionality with required gateway intents
+- Web dashboard (HTML/CSS/JS) displays bot status and features to users
 - Modular architecture separates concerns for easy debugging and maintenance
 - Single process simplifies deployment and management
 
@@ -56,7 +57,11 @@ src/
 │       ├── ping.js            # Ping command (English only)
 │       ├── permission.js      # Permission settings command
 │       └── language.js        # Language selection command
-index.js                        # Main bot entry point, event handlers
+public/
+├── index.html                 # Web dashboard landing page
+├── style.css                  # Dashboard styling
+└── script.js                  # Dashboard interactivity
+index.js                        # Main bot entry point, event handlers, Express server
 ```
 
 **Module Responsibilities**:
