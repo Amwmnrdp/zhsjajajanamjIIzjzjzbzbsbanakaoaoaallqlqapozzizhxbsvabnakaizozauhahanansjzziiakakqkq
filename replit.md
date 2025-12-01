@@ -36,7 +36,8 @@ src/
 │   ├── storage.js             # File I/O for servers.json and languages.json
 │   ├── languages.js           # Translation and language management
 │   ├── permissions.js         # Server permission handling
-│   └── helpers.js             # Utility functions (emoji parsing)
+│   ├── helpers.js             # Utility functions (emoji parsing)
+│   └── submissions.js         # Help and suggestions storage management
 ├── commands/
 │   ├── emoji/
 │   │   ├── addemoji.js        # Add emoji command
@@ -57,10 +58,14 @@ src/
 │       ├── ping.js            # Ping command (English only)
 │       ├── permission.js      # Permission settings command
 │       └── language.js        # Language selection command
+data/
+├── help.json                  # User-submitted help posts storage
+└── suggestions.json           # User-submitted suggestions storage
 public/
-├── index.html                 # Web dashboard landing page
-├── style.css                  # Dashboard styling
-└── script.js                  # Dashboard interactivity
+├── index.html                 # Dark-themed dashboard with hamburger menu
+├── admin.html                 # Admin panel for viewing submissions
+├── style.css                  # Dark theme CSS with animations
+└── script.js                  # Menu logic, modals, API interactions
 index.js                        # Main bot entry point, event handlers, Express server
 ```
 
@@ -70,10 +75,13 @@ index.js                        # Main bot entry point, event handlers, Express 
 - `languages.js`: Translation system, language preferences, cache warming
 - `permissions.js`: Permission checks, server allow/deny logic
 - `helpers.js`: Utility functions for emoji/sticker parsing
+- `submissions.js`: Manages help posts and suggestions storage in JSON files
 - **Emoji commands** (`src/commands/emoji/`): Individual files for each emoji-related command (includes emoji suggestions)
 - **Sticker commands** (`src/commands/sticker/`): Individual files for each sticker-related command
 - **Storage commands** (`src/commands/storage/`): Utility commands (ping, permission settings, language selection)
-- `index.js`: Bot initialization, event handlers, command routing
+- `index.js`: Bot initialization, event handlers, command routing, Express routes
+- `public/index.html`: Dark-themed responsive dashboard
+- `public/admin.html`: Admin panel for viewing help posts and suggestions
 
 ## Command System
 

@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ProEmoji Admin - Submissions</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .admin-header {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            padding: 20px;
+            color: white;
+            text-align: center;
+        }
+        .admin-tabs {
+            display: flex;
+            gap: 10px;
+            margin: 20px;
+        }
+        .admin-tab {
+            padding: 10px 20px;
+            background: rgba(102, 126, 234, 0.2);
+            border: 2px solid rgba(102, 126, 234, 0.3);
+            color: white;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+        .admin-tab.active {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border-color: #667eea;
+        }
+        .submission-item {
+            background: rgba(102, 126, 234, 0.1);
+            padding: 20px;
+            margin: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+    </style>
+</head>
+<body style="background: #0a0e27;">
+    <div class="admin-header">
+        <h1>🔧 Admin Panel - Submissions</h1>
+    </div>
+
+    <div class="admin-tabs">
+        <button class="admin-tab active" id="helpTab">Help Posts</button>
+        <button class="admin-tab" id="suggestionsTab">Suggestions</button>
+    </div>
+
+    <div style="padding: 20px; max-width: 1200px; margin: 0 auto;">
+        <div id="helpContent">
+            <h2 style="color: #667eea; margin-bottom: 20px;">Help & Solutions</h2>
+            <div id="helpList"></div>
+        </div>
+
+        <div id="suggestionsContent" style="display: none;">
+            <h2 style="color: #667eea; margin-bottom: 20px;">User Suggestions</h2>
+            <div id="suggestionsList"></div>
+        </div>
+    </div>
+
+    <script>
+        const helpTab = document.getElementById('helpTab');
+        const suggestionsTab = document.getElementById('suggestionsTab');
+        const helpContent = document.getElementById('helpContent');
+        const suggestionsContent = document.getElementById('suggestionsContent');
+        const helpList = document.getElementById('helpList');
+        const suggestionsList = document.getElementById('suggestionsList');
+
+        helpTab.addEventListener('click', () => {
+            helpTab.classList.add('active');
+            suggestionsTab.classList.remove('active');
+            helpContent.style.display = 'block';
+            suggestionsContent.style.display = 'none';
+        });
+
+        suggestionsTab.addEventListener('click', () => {
+            suggestionsTab.classList.add('active');
+            helpTab.classList.remove('active');
+            suggestionsContent.style.display = 'block';
+            helpContent.style.display = 'none';
+        });
+
+        async function loadHelp() {
+            try {
+                const response = await fetch('/api/help');
+                const helps = await response.json();
+                helpList.innerHTML = '';
+                if (helps.length === 0) {
+                    helpList.innerHTML = '<p style="color: #a0a0a0;">No help posts yet</p>';
+                    return;
+                }
+                helps.forEach(help => {
+                    const div = document.createElement('div');
+                    div.className = 'submission-item';
+                    div.innerHTML = `
+                        <h3 style="color: #667eea; margin-bottom: 10px;">${escapeHtml(help.title)}</h3>
+                        <p style="color: #a0a0a0; line-height: 1.6;">${escapeHtml(help.content)}</p>
+                        <small style="color: #666; display: block; margin-top: 10px;">📅 ${new Date(help.timestamp).toLocaleString()}</small>
+                    `;
+                    helpList.appendChild(div);
+                });
+            } catch (error) {
+                console.error('Error loading help:', error);
+            }
+        }
+
+        async function loadSuggestions() {
+            try {
+                const response = await fetch('/api/suggestions');
+                const suggestions = await response.json();
+                suggestionsList.innerHTML = '';
+                if (suggestions.length === 0) {
+                    suggestionsList.innerHTML = '<p style="color: #a0a0a0;">No suggestions yet</p>';
+                    return;
+                }
+                suggestions.forEach(suggestion => {
+                    const div = document.createElement('div');
+                    div.className = 'submission-item';
+                    div.innerHTML = `
+                        <h3 style="color: #667eea; margin-bottom: 10px;">💡 ${escapeHtml(suggestion.title)}</h3>
+                        <p style="color: #a0a0a0; line-height: 1.6;">${escapeHtml(suggestion.content)}</p>
+                        <small style="color: #666; display: block; margin-top: 10px;">📅 ${new Date(suggestion.timestamp).toLocaleString()}</small>
+                    `;
+                    suggestionsList.appendChild(div);
+                });
+            } catch (error) {
+                console.error('Error loading suggestions:', error);
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        window.addEventListener('load', () => {
+            loadHelp();
+            loadSuggestions();
+        });
+    </script>
+</body>
+</html>

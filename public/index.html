@@ -7,107 +7,218 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>🎨 ProEmoji Bot</h1>
-            <p>Comprehensive Emoji & Sticker Management for Discord</p>
-        </header>
-
-        <div class="status-section">
-            <h2>Bot Status</h2>
-            <div class="status-card">
-                <div class="status-indicator online"></div>
-                <span class="status-text">Online and Ready!</span>
-            </div>
+    <!-- Hamburger Menu -->
+    <div class="hamburger-menu">
+        <div class="hamburger-btn" id="hamburgerBtn">
+            <span></span>
+            <span></span>
+            <span></span>
         </div>
+    </div>
 
-        <div class="features-section">
-            <h2>🚀 Features</h2>
-            <div class="features-grid">
-                <div class="feature-card">
-                    <div class="feature-icon">😊</div>
-                    <h3>Emoji Management</h3>
-                    <p>Add, delete, rename, and search emojis with ease</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">🎫</div>
-                    <h3>Sticker Management</h3>
-                    <p>Create, rename, and delete stickers effortlessly</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">🔄</div>
-                    <h3>Conversions</h3>
-                    <p>Convert emojis to stickers and vice versa</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">🖼️</div>
-                    <h3>Image Upload</h3>
-                    <p>Transform images into emojis and stickers</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">🌍</div>
-                    <h3>12 Languages</h3>
-                    <p>Support for Chinese, English, Arabic, Spanish, and more</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">🔐</div>
-                    <h3>Server Control</h3>
-                    <p>Manage permissions and access by server</p>
+    <!-- Sidebar Menu -->
+    <nav class="sidebar" id="sidebar">
+        <ul class="menu-list">
+            <li><a href="#home" class="menu-link" data-section="home">🏠 Home</a></li>
+            <li><a href="#activation" class="menu-link" data-section="activation">✅ Activation</a></li>
+            <li><a href="#statistics" class="menu-link" data-section="statistics">📊 Statistics</a></li>
+            <li><a href="#commands" class="menu-link" data-section="commands">⚡ Commands</a></li>
+            <li><a href="#help" class="menu-link" data-section="help">❓ Help</a></li>
+            <li><a href="#suggestions" class="menu-link" data-section="suggestions">💡 Suggestions</a></li>
+        </ul>
+    </nav>
+
+    <!-- Overlay -->
+    <div class="overlay" id="overlay"></div>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Home Section -->
+        <section id="home" class="content-section active">
+            <div class="header-hero">
+                <h1>🎨 ProEmoji Bot</h1>
+                <p>Comprehensive Emoji & Sticker Management for Discord</p>
+            </div>
+
+            <div class="status-section">
+                <div class="status-card">
+                    <div class="status-indicator online"></div>
+                    <span class="status-text">Online and Ready!</span>
                 </div>
             </div>
-        </div>
 
-        <div class="languages-section">
-            <h2>🗣️ Supported Languages</h2>
-            <div class="languages-grid">
-                <span class="lang-badge">🇨🇳 Chinese</span>
-                <span class="lang-badge">🇺🇸 English</span>
-                <span class="lang-badge">Syria Flag Arabic</span>
-                <span class="lang-badge">🇪🇸 Spanish</span>
-                <span class="lang-badge">🇷🇺 Russian</span>
-                <span class="lang-badge">🇹🇷 Turkish</span>
-                <span class="lang-badge">🇫🇷 French</span>
-                <span class="lang-badge">🇩🇪 German</span>
-                <span class="lang-badge">🇮🇹 Italian</span>
-                <span class="lang-badge">🇯🇵 Japanese</span>
-                <span class="lang-badge">🇰🇷 Korean</span>
-                <span class="lang-badge">🇵🇹 Portuguese</span>
-            </div>
-        </div>
-
-        <div class="commands-section">
-            <h2>⚡ Popular Commands</h2>
-            <div class="commands-list">
-                <div class="command">
-                    <code>/add_emoji</code>
-                    <span>Add emoji to server</span>
-                </div>
-                <div class="command">
-                    <code>/list_emojis</code>
-                    <span>View all server emojis</span>
-                </div>
-                <div class="command">
-                    <code>/emoji_search</code>
-                    <span>Search and import emojis</span>
-                </div>
-                <div class="command">
-                    <code>/emoji_to_sticker</code>
-                    <span>Convert emoji to sticker</span>
-                </div>
-                <div class="command">
-                    <code>/image_to_emoji</code>
-                    <span>Create emoji from image</span>
-                </div>
-                <div class="command">
-                    <code>/list_stickers</code>
-                    <span>View all server stickers</span>
+            <div class="features-section">
+                <h2>🚀 Features</h2>
+                <div class="features-grid">
+                    <div class="feature-card">
+                        <div class="feature-icon">😊</div>
+                        <h3>Emoji Management</h3>
+                        <p>Add, delete, rename, and search emojis with ease</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">🎫</div>
+                        <h3>Sticker Management</h3>
+                        <p>Create, rename, and delete stickers effortlessly</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">🔄</div>
+                        <h3>Conversions</h3>
+                        <p>Convert emojis to stickers and vice versa</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">🖼️</div>
+                        <h3>Image Upload</h3>
+                        <p>Transform images into emojis and stickers</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">🌍</div>
+                        <h3>12 Languages</h3>
+                        <p>Support for Chinese, English, Arabic, Spanish, and more</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">🔐</div>
+                        <h3>Server Control</h3>
+                        <p>Manage permissions and access by server</p>
+                    </div>
                 </div>
             </div>
-        </div>
+
+            <div class="languages-section">
+                <h2>🗣️ Supported Languages</h2>
+                <div class="languages-grid">
+                    <span class="lang-badge">🇨🇳 Chinese</span>
+                    <span class="lang-badge">🇺🇸 English</span>
+                    <span class="lang-badge">Syria Flag Arabic</span>
+                    <span class="lang-badge">🇪🇸 Spanish</span>
+                    <span class="lang-badge">🇷🇺 Russian</span>
+                    <span class="lang-badge">🇹🇷 Turkish</span>
+                    <span class="lang-badge">🇫🇷 French</span>
+                    <span class="lang-badge">🇩🇪 German</span>
+                    <span class="lang-badge">🇮🇹 Italian</span>
+                    <span class="lang-badge">🇯🇵 Japanese</span>
+                    <span class="lang-badge">🇰🇷 Korean</span>
+                    <span class="lang-badge">🇵🇹 Portuguese</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Activation Section -->
+        <section id="activation" class="content-section">
+            <h2>✅ Activation</h2>
+            <div class="activation-content">
+                <div class="activation-card">
+                    <h3>Quick Start</h3>
+                    <ol>
+                        <li>Add ProEmoji Bot to your Discord server</li>
+                        <li>Grant necessary permissions</li>
+                        <li>Start using commands with <code>/</code></li>
+                    </ol>
+                </div>
+                <div class="activation-card">
+                    <h3>Permissions Required</h3>
+                    <ul>
+                        <li>Manage Emojis and Stickers</li>
+                        <li>Send Messages</li>
+                        <li>Embed Links</li>
+                        <li>View Channels</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- Statistics Section -->
+        <section id="statistics" class="content-section">
+            <h2>📊 Statistics</h2>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <h3>Servers Hosting Bot</h3>
+                    <p class="stat-number" id="serverCount">0</p>
+                </div>
+                <div class="stat-card">
+                    <h3>Status</h3>
+                    <p class="stat-status">🟢 Online</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Commands Section -->
+        <section id="commands" class="content-section">
+            <h2>⚡ All Commands</h2>
+            <div class="commands-tabs">
+                <button class="tab-btn active" data-tab="emoji">Emoji</button>
+                <button class="tab-btn" data-tab="sticker">Sticker</button>
+                <button class="tab-btn" data-tab="utility">Utility</button>
+            </div>
+
+            <div class="commands-list" id="emojiCommands" data-tab="emoji">
+                <div class="command"><code>/add_emoji</code> <span>Add emoji to server</span></div>
+                <div class="command"><code>/list_emojis</code> <span>View all server emojis</span></div>
+                <div class="command"><code>/delete_emoji</code> <span>Delete emoji from server</span></div>
+                <div class="command"><code>/rename_emoji</code> <span>Rename emoji</span></div>
+                <div class="command"><code>/emoji_search</code> <span>Search and import emojis</span></div>
+                <div class="command"><code>/image_to_emoji</code> <span>Create emoji from image</span></div>
+                <div class="command"><code>/emoji_to_sticker</code> <span>Convert emoji to sticker</span></div>
+                <div class="command"><code>/suggest_emojis</code> <span>Get emoji suggestions</span></div>
+            </div>
+
+            <div class="commands-list hidden" id="stickerCommands" data-tab="sticker">
+                <div class="command"><code>/list_stickers</code> <span>View all server stickers</span></div>
+                <div class="command"><code>/image_to_sticker</code> <span>Create sticker from image</span></div>
+                <div class="command"><code>/sticker_to_emoji</code> <span>Convert sticker to emoji</span></div>
+                <div class="command"><code>/rename_sticker</code> <span>Rename sticker (reply)</span></div>
+                <div class="command"><code>/delete_sticker</code> <span>Delete sticker (reply)</span></div>
+            </div>
+
+            <div class="commands-list hidden" id="utilityCommands" data-tab="utility">
+                <div class="command"><code>/ping</code> <span>Check bot response time</span></div>
+                <div class="command"><code>/language</code> <span>Set your preferred language</span></div>
+                <div class="command"><code>/permission</code> <span>Manage server permissions</span></div>
+            </div>
+        </section>
+
+        <!-- Help Section -->
+        <section id="help" class="content-section">
+            <h2>❓ Help & Solutions</h2>
+            <button class="btn-primary" id="postHelpBtn">Post a Solution</button>
+            <div class="help-list" id="helpList"></div>
+        </section>
+
+        <!-- Suggestions Section -->
+        <section id="suggestions" class="content-section">
+            <h2>💡 Suggestions</h2>
+            <button class="btn-primary" id="postSuggestionBtn">Submit a Suggestion</button>
+            <div class="suggestions-list" id="suggestionsList"></div>
+        </section>
 
         <footer>
             <p>ProEmoji Bot © 2024 | Built with Discord.js & Node.js</p>
         </footer>
+    </main>
+
+    <!-- Help Modal -->
+    <div class="modal" id="helpModal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Post a Solution</h2>
+            <form id="helpForm">
+                <input type="text" id="helpTitle" placeholder="Problem Title" required>
+                <textarea id="helpContent" placeholder="Describe the solution..." rows="6" required></textarea>
+                <button type="submit" class="btn-primary">Submit</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Suggestion Modal -->
+    <div class="modal" id="suggestionModal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Submit a Suggestion</h2>
+            <form id="suggestionForm">
+                <input type="text" id="suggestionTitle" placeholder="Suggestion Title" required>
+                <textarea id="suggestionContent" placeholder="Describe your suggestion..." rows="6" required></textarea>
+                <button type="submit" class="btn-primary">Submit</button>
+            </form>
+        </div>
     </div>
 
     <script src="script.js"></script>

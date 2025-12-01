@@ -3,8 +3,12 @@ const path = require('path');
 const app = express();
 const { Client, GatewayIntentBits, EmbedBuilder, PermissionsBitField } = require('discord.js');
 
-// Serve static files from public directory
+// Middleware
+app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
+
+// Import submissions utility
+const { getHelp, addHelp, getSuggestions, addSuggestion } = require('./src/utils/submissions');
 
 // Import utilities
 const { SUPPORTED_LANGUAGES, COMMAND_DEFINITIONS } = require('./src/utils/constants');
@@ -395,9 +399,55 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// API health check
-app.get('/health', (req, res) => {
+// Admin panel
+app.get('/admin', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'admin.html'));
+});
+
+// API endpoints
+app.get('/api/health', (req, res) => {
     res.json({ status: 'online', bot: 'ProEmoji' });
+});
+
+// Stats endpoint
+app.get('/api/stats', (req, res) => {
+    res.json({ servers: client.guilds.cache.size });
+});
+
+// Help endpoints
+app.get('/api/help', (req, res) => {
+    res.json(getHelp());
+});
+
+app.post('/api/help', (req, res) => {
+    const { title, content, timestamp } = req.body;
+    if (!title || !content) {
+        return res.status(400).json({ error: 'Missing fields' });
+    }
+    const success = addHelp(title, content, timestamp || new Date().toISOString());
+    if (success) {
+        res.json({ success: true });
+    } else {
+        res.status(500).json({ error: 'Failed to add help' });
+    }
+});
+
+// Suggestions endpoints
+app.get('/api/suggestions', (req, res) => {
+    res.json(getSuggestions());
+});
+
+app.post('/api/suggestions', (req, res) => {
+    const { title, content, timestamp } = req.body;
+    if (!title || !content) {
+        return res.status(400).json({ error: 'Missing fields' });
+    }
+    const success = addSuggestion(title, content, timestamp || new Date().toISOString());
+    if (success) {
+        res.json({ success: true });
+    } else {
+        res.status(500).json({ error: 'Failed to add suggestion' });
+    }
 });
 
 const PORT = 3000;
