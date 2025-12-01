@@ -16,6 +16,7 @@ const renameemoji = require('./src/commands/emoji/renameemoji');
 const emojisearch = require('./src/commands/emoji/emojisearch');
 const imagetoemoji = require('./src/commands/emoji/imagetoemoji');
 const emojiTosticker = require('./src/commands/emoji/emojiTosticker');
+const suggestemojis = require('./src/commands/emoji/suggestemojis');
 
 // Import sticker commands
 const deletesticker = require('./src/commands/sticker/deletesticker');
@@ -23,11 +24,10 @@ const renamesticker = require('./src/commands/sticker/renamesticker');
 const stickertoemi = require('./src/commands/sticker/stickertoemi');
 const imagetosticker = require('./src/commands/sticker/imagetosticker');
 
-// Import other commands
-const ping = require('./src/commands/other/ping');
-const permission = require('./src/commands/other/permission');
-const language = require('./src/commands/other/language');
-const suggestemojis = require('./src/commands/other/suggestemojis');
+// Import storage commands
+const ping = require('./src/commands/storage/ping');
+const permission = require('./src/commands/storage/permission');
+const language = require('./src/commands/storage/language');
 
 const client = new Client({
     intents: [

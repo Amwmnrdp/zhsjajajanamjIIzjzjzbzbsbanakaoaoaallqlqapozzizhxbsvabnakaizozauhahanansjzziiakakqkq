@@ -44,17 +44,17 @@ src/
 │   │   ├── renameemoji.js     # Rename emoji command
 │   │   ├── emojisearch.js     # Search for emojis with numbered button selection
 │   │   ├── imagetoemoji.js    # Convert image to emoji
-│   │   └── emojiTosticker.js  # Convert emoji to sticker
+│   │   ├── emojiTosticker.js  # Convert emoji to sticker
+│   │   └── suggestemojis.js   # Suggest random emojis command
 │   ├── sticker/
 │   │   ├── deletesticker.js   # Delete sticker (via reply)
 │   │   ├── renamesticker.js   # Rename sticker (via reply)
 │   │   ├── stickertoemi.js    # Convert sticker to emoji (via reply)
 │   │   └── imagetosticker.js  # Convert image to sticker
-│   └── other/
+│   └── storage/
 │       ├── ping.js            # Ping command (English only)
 │       ├── permission.js      # Permission settings command
-│       ├── language.js        # Language selection command
-│       └── suggestemojis.js   # Suggest random emojis command
+│       └── language.js        # Language selection command
 index.js                        # Main bot entry point, event handlers
 ```
 
@@ -64,9 +64,9 @@ index.js                        # Main bot entry point, event handlers
 - `languages.js`: Translation system, language preferences, cache warming
 - `permissions.js`: Permission checks, server allow/deny logic
 - `helpers.js`: Utility functions for emoji/sticker parsing
-- **Emoji commands** (`src/commands/emoji/`): Individual files for each emoji-related command
+- **Emoji commands** (`src/commands/emoji/`): Individual files for each emoji-related command (includes emoji suggestions)
 - **Sticker commands** (`src/commands/sticker/`): Individual files for each sticker-related command
-- **Other commands** (`src/commands/other/`): Utility commands (ping, permission, language, suggestions)
+- **Storage commands** (`src/commands/storage/`): Utility commands (ping, permission settings, language selection)
 - `index.js`: Bot initialization, event handlers, command routing
 
 ## Command System
