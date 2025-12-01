@@ -50,7 +50,8 @@ src/
 │   │   ├── deletesticker.js   # Delete sticker (via reply)
 │   │   ├── renamesticker.js   # Rename sticker (via reply)
 │   │   ├── stickertoemi.js    # Convert sticker to emoji (via reply)
-│   │   └── imagetosticker.js  # Convert image to sticker
+│   │   ├── imagetosticker.js  # Convert image to sticker
+│   │   └── liststicker.js     # List all stickers command
 │   └── storage/
 │       ├── ping.js            # Ping command (English only)
 │       ├── permission.js      # Permission settings command

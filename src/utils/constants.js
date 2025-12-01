@@ -188,6 +188,10 @@ const COMMAND_DEFINITIONS = [
         ]
     },
     {
+        name: 'list_stickers',
+        description: 'List all server stickers'
+    },
+    {
         name: 'ping',
         description: 'Check bot response speed'
     }

@@ -23,6 +23,7 @@ const deletesticker = require('./src/commands/sticker/deletesticker');
 const renamesticker = require('./src/commands/sticker/renamesticker');
 const stickertoemi = require('./src/commands/sticker/stickertoemi');
 const imagetosticker = require('./src/commands/sticker/imagetosticker');
+const liststicker = require('./src/commands/sticker/liststicker');
 
 // Import storage commands
 const ping = require('./src/commands/storage/ping');
@@ -162,6 +163,7 @@ client.on('interactionCreate', async interaction => {
             setTimeout(() => stickerToEmojiSessions.has(msg.id) && stickerToEmojiSessions.delete(msg.id), 60000);
         }
         else if (interaction.commandName === 'image_to_sticker') await imagetosticker.execute(interaction, langCode, convertedImagesToStickers);
+        else if (interaction.commandName === 'list_stickers') await liststicker.execute(interaction, langCode);
     } catch (error) {
         console.error('⚠️ Interaction error:', error.message);
     }
