@@ -10,13 +10,14 @@ Preferred communication style: Simple, everyday language.
 
 ## Core Application Structure
 
-**Problem**: Need a reliable Discord bot that can run continuously and provide web health checks.
+**Problem**: Need a reliable Discord bot that can run continuously and provide web health checks with clean, modular code.
 
-**Solution**: Combined Discord.js client with Express web server in a single application.
+**Solution**: Combined Discord.js client with Express web server, organized into separate utility modules for maintainability.
 
 **Rationale**: 
 - Express server provides HTTP endpoint for health monitoring and uptime tracking
 - Discord.js client handles all bot functionality with required gateway intents
+- Modular architecture separates concerns for easy debugging and maintenance
 - Single process simplifies deployment and management
 
 **Key Intents**:
@@ -24,20 +25,43 @@ Preferred communication style: Simple, everyday language.
 - GuildMessages and MessageContent for command processing
 - GuildMessageReactions for interactive features
 
+## Modular Code Organization
+
+**Directory Structure**:
+```
+src/
+├── utils/
+│   ├── constants.js      # Supported languages, command definitions
+│   ├── storage.js        # File I/O for servers.json and languages.json
+│   ├── languages.js      # Translation and language management
+│   ├── permissions.js    # Server permission handling
+│   └── helpers.js        # Utility functions (emoji parsing)
+index.js                   # Main bot entry point with all command handlers
+```
+
+**Module Responsibilities**:
+- `constants.js`: Centralized configuration (SUPPORTED_LANGUAGES, COMMAND_DEFINITIONS)
+- `storage.js`: File operations for persistence (JSON read/write)
+- `languages.js`: Translation system, language preferences, cache warming
+- `permissions.js`: Permission checks, server allow/deny logic
+- `helpers.js`: Utility functions for emoji/sticker parsing
+- `index.js`: Bot initialization, event handlers, command logic
+
 ## Command System
 
-**Problem**: Need flexible command handling for Discord interactions.
+**Problem**: Need flexible command handling for Discord interactions with clean separation of concerns.
 
-**Solution**: Prefix-based command system ('+' prefix) with in-memory state management.
+**Solution**: Slash command system with modular utility functions.
 
 **Design Pattern**:
-- Commands parsed from message content with prefix detection
+- All commands defined in `constants.js` for easy management
+- Command handlers in `index.js` interaction event
+- Utility functions imported from modular `src/utils/` files
 - State stored in JavaScript Maps for runtime performance
 - Session-based operations for multi-step workflows (deletion, conversion)
 
 **State Management**:
 - `allowedServers`: Map of authorized server configurations
-- `serverLanguages`: Map of language preferences per server
 - `stickerDeletionSessions`: Temporary session data for sticker deletion workflows
 - `stickerToEmojiSessions`: Session data for sticker-to-emoji conversions
 - `convertedEmojisToStickers`: Track emoji-to-sticker conversion history

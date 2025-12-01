@@ -1,6 +1,5 @@
 const express = require('express');
 const app = express();
-const fs = require('fs');
 const { 
     Client, 
     GatewayIntentBits, 
@@ -16,7 +15,13 @@ const {
     TextInputStyle
 } = require('discord.js');
 const isImageUrl = require('is-image-url');
-const translate = require('google-translate-api-x');
+
+// Import utilities
+const { SUPPORTED_LANGUAGES, COMMAND_DEFINITIONS } = require('./src/utils/constants');
+const { readServersFile, writeServersFile } = require('./src/utils/storage');
+const { loadServerLanguages, saveServerLanguage, getServerLanguage, t, preWarmCache } = require('./src/utils/languages');
+const { allowedServers, setServerPermission, getServerPermission, handlePermissionCommand } = require('./src/utils/permissions');
+const { parseEmoji } = require('./src/utils/helpers');
 
 const client = new Client({
     intents: [
@@ -30,8 +35,6 @@ const client = new Client({
 });
 
 const prefix = '+';
-const allowedServers = new Map();
-const serverLanguages = new Map();
 const usedUrls = {};
 let suggestedEmojis = [];
 const stickerDeletionSessions = new Map();
@@ -40,175 +43,8 @@ const stickerRenameSessions = new Map();
 const convertedEmojisToStickers = new Map();
 const convertedImagesToStickers = new Map();
 const convertedStickersToEmojis = new Map();
-const SERVERS_FILE = 'servers.json';
-const LANGUAGES_FILE = 'languages.json';
-const translationCache = new Map();
-
-const SUPPORTED_LANGUAGES = {
-    'en': { name: 'English', flag: '🇺🇸', native: 'English', translateCode: 'en' },
-    'ar': { name: 'Arabic', flag: '<:Syria:1443915175379079208>', native: 'العربية', translateCode: 'ar' },
-    'zh': { name: 'Chinese', flag: '🇨🇳', native: '中文', translateCode: 'zh-CN' },
-    'es': { name: 'Spanish', flag: '🇪🇸', native: 'Español', translateCode: 'es' },
-    'ru': { name: 'Russian', flag: '🇷🇺', native: 'Русский', translateCode: 'ru' },
-    'tr': { name: 'Turkish', flag: '🇹🇷', native: 'Türkçe', translateCode: 'tr' },
-    'fr': { name: 'French', flag: '🇫🇷', native: 'Français', translateCode: 'fr' },
-    'de': { name: 'German', flag: '🇩🇪', native: 'Deutsch', translateCode: 'de' },
-    'it': { name: 'Italian', flag: '🇮🇹', native: 'Italiano', translateCode: 'it' },
-    'ja': { name: 'Japanese', flag: '🇯🇵', native: '日本語', translateCode: 'ja' },
-    'ko': { name: 'Korean', flag: '🇰🇷', native: '한국어', translateCode: 'ko' },
-    'pt': { name: 'Portuguese', flag: '🇵🇹', native: 'Português', translateCode: 'pt' }
-};
-
-function readLanguagesFile() {
-    try {
-        if (!fs.existsSync(LANGUAGES_FILE)) {
-            fs.writeFileSync(LANGUAGES_FILE, '{}');
-            return {};
-        }
-        const data = fs.readFileSync(LANGUAGES_FILE, 'utf8');
-        return JSON.parse(data);
-    } catch (error) {
-        console.error('⚠️ Warning: Could not read languages file:', error.message);
-        return {};
-    }
-}
-
-function writeLanguagesFile(languages) {
-    try {
-        fs.writeFileSync(LANGUAGES_FILE, JSON.stringify(languages, null, 2));
-    } catch (error) {
-        console.error('⚠️ Warning: Could not write languages file:', error.message);
-    }
-}
-
-const LEGACY_LANGUAGE_MAP = {
-    'english': 'en',
-    'arabic': 'ar',
-    'chinese': 'zh',
-    'spanish': 'es',
-    'russian': 'ru',
-    'turkish': 'tr',
-    'french': 'fr',
-    'german': 'de',
-    'italian': 'it',
-    'japanese': 'ja',
-    'korean': 'ko',
-    'portuguese': 'pt'
-};
-
-function loadServerLanguages() {
-    const languages = readLanguagesFile();
-    let needsSave = false;
-    
-    for (const [guildId, langCode] of Object.entries(languages)) {
-        const normalizedCode = LEGACY_LANGUAGE_MAP[langCode.toLowerCase()] || langCode;
-        if (normalizedCode !== langCode) {
-            languages[guildId] = normalizedCode;
-            needsSave = true;
-        }
-        serverLanguages.set(guildId, normalizedCode);
-    }
-    
-    if (needsSave) {
-        writeLanguagesFile(languages);
-        console.log('✅ Migrated legacy language codes to ISO format');
-    }
-}
-
-function saveServerLanguage(guildId, langCode) {
-    const languages = readLanguagesFile();
-    languages[guildId] = langCode;
-    writeLanguagesFile(languages);
-    serverLanguages.set(guildId, langCode);
-}
-
-async function t(text, langCode) {
-    if (!text || langCode === 'en') return text;
-    
-    const cacheKey = `${langCode}:${text}`;
-    if (translationCache.has(cacheKey)) {
-        return translationCache.get(cacheKey);
-    }
-    
-    try {
-        const translateCode = SUPPORTED_LANGUAGES[langCode]?.translateCode || langCode;
-        const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Translation timeout')), 5000)
-        );
-        
-        const result = await Promise.race([
-            translate(text, { from: 'en', to: translateCode }),
-            timeoutPromise
-        ]);
-        
-        const translated = result.text;
-        translationCache.set(cacheKey, translated);
-        
-        if (translationCache.size > 10000) {
-            const keysToDelete = Array.from(translationCache.keys()).slice(0, 2000);
-            keysToDelete.forEach(key => translationCache.delete(key));
-        }
-        
-        return translated;
-    } catch (error) {
-        console.error('⚠️ Translation error:', error.message);
-        return text;
-    }
-}
 
 loadServerLanguages();
-
-async function preWarmCache() {
-    const commonMessages = [
-        'Pong!', 'Gateway latency:', 'Response time:', 'Permission Settings', 'Allow', 'Refuse'
-    ];
-    
-    setImmediate(async () => {
-        for (const lang of Object.keys(SUPPORTED_LANGUAGES)) {
-            if (lang !== 'en') {
-                for (const msg of commonMessages) {
-                    t(msg, lang).catch(() => {});
-                }
-            }
-        }
-        console.log('✅ Cache pre-warming in progress (non-blocking)');
-    });
-}
-
-function parseEmoji(emoji) {
-    const regex = /<(a)?:(\w+):(\d+)>/;
-    const match = emoji.match(regex);
-    if (match) {
-        return {
-            animated: !!match[1],
-            name: match[2],
-            id: match[3]
-        };
-    }
-    return { id: null };
-}
-
-function readServersFile() {
-    try {
-        if (!fs.existsSync(SERVERS_FILE)) {
-            fs.writeFileSync(SERVERS_FILE, '[]');
-            return [];
-        }
-        const data = fs.readFileSync(SERVERS_FILE, 'utf8');
-        return JSON.parse(data);
-    } catch (error) {
-        console.error('⚠️ Warning: Could not read servers file:', error.message);
-        return [];
-    }
-}
-
-function writeServersFile(servers) {
-    try {
-        fs.writeFileSync(SERVERS_FILE, JSON.stringify(servers, null, 2));
-    } catch (error) {
-        console.error('⚠️ Warning: Could not write servers file:', error.message);
-    }
-}
 
 client.once('ready', async () => {
     console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
@@ -226,172 +62,7 @@ client.once('ready', async () => {
     });
 
     try {
-        const commands = [
-            {
-                name: 'permission',
-                description: 'Set permissions for emoji suggestions'
-            },
-            {
-                name: 'suggestemojis',
-                description: 'Get 5 emoji suggestions'
-            },
-            {
-                name: 'emoji_search',
-                description: 'Search for emojis by name',
-                options: [
-                    {
-                        name: 'search',
-                        type: ApplicationCommandOptionType.String,
-                        description: 'Emoji name to search for',
-                        required: true
-                    }
-                ]
-            },
-            {
-                name: 'addemoji',
-                description: 'Add an emoji to server',
-                options: [
-                    {
-                        name: 'emoji',
-                        type: ApplicationCommandOptionType.String,
-                        description: 'The emoji to add',
-                        required: true
-                    },
-                    {
-                        name: 'name',
-                        type: ApplicationCommandOptionType.String,
-                        description: 'Custom name (optional)',
-                        required: false
-                    }
-                ]
-            },
-            {
-                name: 'image_to_emoji',
-                description: 'Convert image to emoji',
-                options: [
-                    {
-                        name: 'name',
-                        type: ApplicationCommandOptionType.String,
-                        description: 'Emoji name',
-                        required: true
-                    },
-                    {
-                        name: 'url',
-                        type: ApplicationCommandOptionType.String,
-                        description: 'Image URL',
-                        required: true
-                    }
-                ]
-            },
-            {
-                name: 'emoji_to_sticker',
-                description: 'Convert emoji to sticker',
-                options: [
-                    {
-                        name: 'emoji',
-                        type: ApplicationCommandOptionType.String,
-                        description: 'The emoji to convert',
-                        required: true
-                    },
-                    {
-                        name: 'name',
-                        type: ApplicationCommandOptionType.String,
-                        description: 'Sticker name',
-                        required: true
-                    }
-                ]
-            },
-            {
-                name: 'image_to_sticker',
-                description: 'Convert image to sticker',
-                options: [
-                    {
-                        name: 'url',
-                        type: ApplicationCommandOptionType.String,
-                        description: 'Image URL',
-                        required: true
-                    },
-                    {
-                        name: 'name',
-                        type: ApplicationCommandOptionType.String,
-                        description: 'Sticker name',
-                        required: true
-                    }
-                ]
-            },
-            {
-                name: 'list_emojis',
-                description: 'List all server emojis'
-            },
-            {
-                name: 'language',
-                description: 'Change bot language'
-            },
-            {
-                name: 'delete_emoji',
-                description: 'Delete an emoji',
-                options: [
-                    {
-                        name: 'emoji',
-                        type: ApplicationCommandOptionType.String,
-                        description: 'Emoji to delete',
-                        required: true
-                    }
-                ]
-            },
-            {
-                name: 'rename_emoji',
-                description: 'Rename an emoji',
-                options: [
-                    {
-                        name: 'emoji',
-                        type: ApplicationCommandOptionType.String,
-                        description: 'Emoji to rename',
-                        required: true
-                    },
-                    {
-                        name: 'name',
-                        type: ApplicationCommandOptionType.String,
-                        description: 'New name',
-                        required: true
-                    }
-                ]
-            },
-            {
-                name: 'delete_sticker',
-                description: 'Delete a sticker'
-            },
-            {
-                name: 'rename_sticker',
-                description: 'Rename a sticker',
-                options: [
-                    {
-                        name: 'name',
-                        type: ApplicationCommandOptionType.String,
-                        description: 'New sticker name',
-                        required: true
-                    }
-                ]
-            },
-            {
-                name: 'sticker_to_emoji',
-                description: 'Convert sticker to emoji',
-                options: [
-                    {
-                        name: 'name',
-                        type: ApplicationCommandOptionType.String,
-                        description: 'Emoji name',
-                        required: true
-                    }
-                ]
-            },
-            {
-                name: 'ping',
-                description: 'Check bot response speed'
-            }
-        ];
-
-        await client.application.commands.set(commands);
+        await client.application.commands.set(COMMAND_DEFINITIONS);
         console.log('✅ Slash commands registered!');
         console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
         
@@ -402,8 +73,8 @@ client.once('ready', async () => {
 });
 
 client.on('guildCreate', guild => {
-    allowedServers.set(guild.id, true);
-    serverLanguages.set(guild.id, 'en');
+    setServerPermission(guild.id, true);
+    saveServerLanguage(guild.id, 'en');
     const servers = readServersFile();
     if (!servers.includes(guild.name)) {
         servers.push(guild.name);
@@ -414,7 +85,6 @@ client.on('guildCreate', guild => {
 
 client.on('guildDelete', guild => {
     allowedServers.delete(guild.id);
-    serverLanguages.delete(guild.id);
     const servers = readServersFile();
     const updatedServers = servers.filter(name => name !== guild.name);
     writeServersFile(updatedServers);
@@ -436,7 +106,7 @@ client.on('interactionCreate', async interaction => {
     }
     
     if (!interaction.isCommand()) return;
-    const langCode = serverLanguages.get(interaction.guild.id) || 'en';
+    const langCode = getServerLanguage(interaction.guild.id);
 
     try {
         if (interaction.commandName === 'ping') {
@@ -455,42 +125,7 @@ client.on('interactionCreate', async interaction => {
         }
 
         if (interaction.commandName === 'permission') {
-            if (!interaction.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
-                const embed = new EmbedBuilder()
-                    .setDescription('❌ ' + await t('Need ADMINISTRATOR permission!', langCode))
-                    .setColor('#FF0000');
-                await interaction.reply({ embeds: [embed], ephemeral: true });
-                return;
-            }
-
-            const buttonRow = new ActionRowBuilder().addComponents(
-                new ButtonBuilder().setCustomId('allow').setLabel('✅ ' + await t('Allow', langCode)).setStyle(ButtonStyle.Success),
-                new ButtonBuilder().setCustomId('refuse').setLabel('❌ ' + await t('Refuse', langCode)).setStyle(ButtonStyle.Danger)
-            );
-
-            const embed = new EmbedBuilder()
-                .setTitle('🔐 ' + await t('Permission Settings', langCode))
-                .setDescription(await t('Allow bot to suggest emojis from this server?', langCode))
-                .setColor('#00FFFF');
-
-            await interaction.reply({ embeds: [embed], components: [buttonRow] });
-
-            const filter = i => (i.customId === 'allow' || i.customId === 'refuse') && i.user.id === interaction.user.id;
-            const collector = interaction.channel.createMessageComponentCollector({ filter, time: 60000 });
-
-            collector.on('collect', async i => {
-                await i.deferUpdate();
-                if (i.customId === 'allow') {
-                    allowedServers.set(interaction.guild.id, true);
-                    const e = new EmbedBuilder().setTitle('✅ ' + await t('Permission Granted', langCode)).setDescription(await t('Bot can suggest emojis from this server.', langCode)).setColor('#00FF00');
-                    await i.editReply({ embeds: [e], components: [] });
-                } else {
-                    allowedServers.set(interaction.guild.id, false);
-                    const e = new EmbedBuilder().setTitle('❌ ' + await t('Permission Denied', langCode)).setDescription(await t('Bot will NOT suggest emojis.', langCode)).setColor('#FF0000');
-                    await i.editReply({ embeds: [e], components: [] });
-                }
-                collector.stop();
-            });
+            await handlePermissionCommand(interaction, langCode);
         }
 
         if (interaction.commandName === 'emoji_search') {
