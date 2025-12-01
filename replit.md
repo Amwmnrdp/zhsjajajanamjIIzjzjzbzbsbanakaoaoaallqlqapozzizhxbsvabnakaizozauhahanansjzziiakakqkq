@@ -31,12 +31,31 @@ Preferred communication style: Simple, everyday language.
 ```
 src/
 ├── utils/
-│   ├── constants.js      # Supported languages, command definitions
-│   ├── storage.js        # File I/O for servers.json and languages.json
-│   ├── languages.js      # Translation and language management
-│   ├── permissions.js    # Server permission handling
-│   └── helpers.js        # Utility functions (emoji parsing)
-index.js                   # Main bot entry point with all command handlers
+│   ├── constants.js           # Supported languages, command definitions
+│   ├── storage.js             # File I/O for servers.json and languages.json
+│   ├── languages.js           # Translation and language management
+│   ├── permissions.js         # Server permission handling
+│   └── helpers.js             # Utility functions (emoji parsing)
+├── commands/
+│   ├── emoji/
+│   │   ├── addemoji.js        # Add emoji command
+│   │   ├── listemoji.js       # List all emojis command
+│   │   ├── deletemoji.js      # Delete emoji command
+│   │   ├── renameemoji.js     # Rename emoji command
+│   │   ├── emojisearch.js     # Search for emojis with numbered button selection
+│   │   ├── imagetoemoji.js    # Convert image to emoji
+│   │   └── emojiTosticker.js  # Convert emoji to sticker
+│   ├── sticker/
+│   │   ├── deletesticker.js   # Delete sticker (via reply)
+│   │   ├── renamesticker.js   # Rename sticker (via reply)
+│   │   ├── stickertoemi.js    # Convert sticker to emoji (via reply)
+│   │   └── imagetosticker.js  # Convert image to sticker
+│   └── other/
+│       ├── ping.js            # Ping command (English only)
+│       ├── permission.js      # Permission settings command
+│       ├── language.js        # Language selection command
+│       └── suggestemojis.js   # Suggest random emojis command
+index.js                        # Main bot entry point, event handlers
 ```
 
 **Module Responsibilities**:
@@ -45,7 +64,10 @@ index.js                   # Main bot entry point with all command handlers
 - `languages.js`: Translation system, language preferences, cache warming
 - `permissions.js`: Permission checks, server allow/deny logic
 - `helpers.js`: Utility functions for emoji/sticker parsing
-- `index.js`: Bot initialization, event handlers, command logic
+- **Emoji commands** (`src/commands/emoji/`): Individual files for each emoji-related command
+- **Sticker commands** (`src/commands/sticker/`): Individual files for each sticker-related command
+- **Other commands** (`src/commands/other/`): Utility commands (ping, permission, language, suggestions)
+- `index.js`: Bot initialization, event handlers, command routing
 
 ## Command System
 
