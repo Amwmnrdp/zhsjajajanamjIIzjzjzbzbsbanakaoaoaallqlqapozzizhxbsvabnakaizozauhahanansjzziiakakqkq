@@ -13,7 +13,7 @@ async function execute(interaction, langCode, convertedImagesToStickers) {
     const stickerName = interaction.options.getString('name');
 
     if (!isImageUrl(imageUrl)) {
-        const embed = new EmbedBuilder().setDescription('❌ ' + await t('Invalid image URL!', langCode)).setColor('#FF0000');
+        const embed = new EmbedBuilder().setDescription('❌ ' + await t('Invalid image URL!', langCode)).setColor('#FF0000').setFooter({ text: `${interaction.user.displayName} (@${interaction.user.username})`, iconURL: interaction.user.displayAvatarURL() });
         await interaction.reply({ embeds: [embed] });
         return;
     }
@@ -27,7 +27,7 @@ async function execute(interaction, langCode, convertedImagesToStickers) {
             .setDescription(await t('This image has already been converted to a sticker!', langCode) + `\n\n**${await t('Existing Sticker Name:', langCode)}** ${stickerInfo.stickerName}\n**${await t('Sticker ID:', langCode)}** ${stickerInfo.stickerId}\n\n${await t('Delete the sticker to convert again.', langCode)}`)
             .setThumbnail(stickerUrl)
             .setColor('#FF9900')
-            .setFooter({ text: await t('This conversion is already done.', langCode) });
+            .setFooter({ text: await t('This conversion is already done.', langCode) + ` • ${interaction.user.displayName} (@${interaction.user.username})`, iconURL: interaction.user.displayAvatarURL() });
         await interaction.reply({ embeds: [embed] });
         return;
     }
@@ -42,7 +42,7 @@ async function execute(interaction, langCode, convertedImagesToStickers) {
             .setDescription(await t('A sticker with this name already exists!', langCode) + `\n\n**${await t('Existing Sticker Name:', langCode)}** ${duplicateByName.name}\n**${await t('Sticker ID:', langCode)}** ${duplicateByName.id}`)
             .setThumbnail(stickerUrl)
             .setColor('#FF9900')
-            .setFooter({ text: await t('Please choose a different name.', langCode) });
+            .setFooter({ text: await t('Please choose a different name.', langCode) + ` • ${interaction.user.displayName} (@${interaction.user.username})`, iconURL: interaction.user.displayAvatarURL() });
         await interaction.reply({ embeds: [embed] });
         return;
     }
@@ -60,7 +60,7 @@ async function execute(interaction, langCode, convertedImagesToStickers) {
             .setDescription(await t('Successfully converted image to sticker!', langCode) + `\n\n**${await t('Sticker Name:', langCode)}** ${stickerName}\n**${await t('Sticker ID:', langCode)}** ${sticker.id}`)
             .setImage(imageUrl)
             .setColor('#00FF00')
-            .setFooter({ text: await t('You can now use this sticker in your server!', langCode) });
+            .setFooter({ text: await t('You can now use this sticker in your server!', langCode) + ` • ${interaction.user.displayName} (@${interaction.user.username})`, iconURL: interaction.user.displayAvatarURL() });
 
         await interaction.reply({ embeds: [embed] });
         convertedImagesToStickers.set(imageTrackingKey, {
@@ -78,7 +78,8 @@ async function execute(interaction, langCode, convertedImagesToStickers) {
             await t('Error:', langCode) + ' ' + error.message;
         const embed = new EmbedBuilder()
             .setDescription(`❌ ${errorMsg}`)
-            .setColor('#FF0000');
+            .setColor('#FF0000')
+            .setFooter({ text: `${interaction.user.displayName} (@${interaction.user.username})`, iconURL: interaction.user.displayAvatarURL() });
         await interaction.reply({ embeds: [embed] });
         console.error(`⚠️ Discord Error in image_to_sticker:`, error.code, error.message);
     }

@@ -99,7 +99,7 @@ async function execute(interaction, langCode, client) {
             .setTitle('🔍 ' + await t('Emoji Search Results', langCode))
             .setDescription(description)
             .setColor('#00FFFF')
-            .setFooter({ text: await t('Click a button to add an emoji. 2-minute timeout.', langCode) });
+            .setFooter({ text: await t('Click a button to add an emoji. 2-minute timeout.', langCode) + ` • ${interaction.user.displayName} (@${interaction.user.username})`, iconURL: interaction.user.displayAvatarURL() });
 
         const msg = await interaction.reply({ embeds: [embed], components: rows, fetchReply: true });
         return msg;
@@ -149,7 +149,7 @@ async function execute(interaction, langCode, client) {
                     .setDescription(list)
                     .setColor('#FFA500')
                     .addFields({ name: await t('Selected', langCode), value: `${selectedEmojis.size}`, inline: true })
-                    .setFooter({ text: await t('Click "Done" to add selected emojis.', langCode) });
+                    .setFooter({ text: await t('Click "Done" to add selected emojis.', langCode) + ` • ${interaction.user.displayName} (@${interaction.user.username})`, iconURL: interaction.user.displayAvatarURL() });
                 
                 await i.editReply({ embeds: [embed] });
             }
@@ -180,7 +180,8 @@ async function execute(interaction, langCode, client) {
             const embed = new EmbedBuilder()
                 .setTitle('✅ ' + await t('Complete', langCode))
                 .setDescription(await t('Added', langCode) + ` **${addedCount}** ${await t('emojis', langCode)}!`)
-                .setColor('#00FF00');
+                .setColor('#00FF00')
+                .setFooter({ text: `${interaction.user.displayName} (@${interaction.user.username})`, iconURL: interaction.user.displayAvatarURL() });
             
             await i.editReply({ embeds: [embed], components: [] });
             collector.stop();

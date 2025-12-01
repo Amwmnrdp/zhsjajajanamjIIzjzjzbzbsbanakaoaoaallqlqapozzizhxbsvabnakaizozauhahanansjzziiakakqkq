@@ -37,7 +37,7 @@ async function execute(interaction, langCode, client) {
         .setTitle('💡 ' + await t('Suggested Emojis', langCode))
         .setDescription(await t('Here are 5 suggestions:', langCode) + '\n' + emojis.map(e => e.toString()).join(' '))
         .setColor('#00FFFF')
-        .setFooter({ text: await t('React with checkmark to add or X to cancel.', langCode) });
+        .setFooter({ text: await t('React with checkmark to add or X to cancel.', langCode) + ` • ${interaction.user.displayName} (@${interaction.user.username})`, iconURL: interaction.user.displayAvatarURL() });
 
     const msg = await interaction.reply({ embeds: [embed], fetchReply: true });
     try {

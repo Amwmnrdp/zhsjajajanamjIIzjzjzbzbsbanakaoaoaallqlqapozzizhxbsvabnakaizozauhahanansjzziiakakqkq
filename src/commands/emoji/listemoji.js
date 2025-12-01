@@ -23,7 +23,7 @@ async function execute(interaction, langCode) {
         .setTitle(`📋 ${emojisTitle}`)
         .setColor('#00FFFF')
         .setDescription(pages[page])
-        .setFooter({ text: `${pageText} ${page + 1}/${pages.length}`, iconURL: interaction.user.displayAvatarURL() });
+        .setFooter({ text: `${pageText} ${page + 1}/${pages.length} • ${interaction.user.displayName} (@${interaction.user.username})`, iconURL: interaction.user.displayAvatarURL() });
 
     const row = new ActionRowBuilder().addComponents(
         new ButtonBuilder().setCustomId('prev').setLabel('◀️').setStyle(ButtonStyle.Primary).setDisabled(true),
@@ -47,7 +47,7 @@ async function execute(interaction, langCode) {
             .setTitle(`📋 ${emojisTitleUpdate}`)
             .setColor('#00FFFF')
             .setDescription(pages[page])
-            .setFooter({ text: `${pageTextUpdate} ${page + 1}/${pages.length}`, iconURL: interaction.user.displayAvatarURL() });
+            .setFooter({ text: `${pageTextUpdate} ${page + 1}/${pages.length} • ${interaction.user.displayName} (@${interaction.user.username})`, iconURL: interaction.user.displayAvatarURL() });
 
         const prevButton = new ButtonBuilder().setCustomId('prev').setLabel('◀️').setStyle(ButtonStyle.Primary).setDisabled(page === 0);
         const nextButton = new ButtonBuilder().setCustomId('next').setLabel('▶️').setStyle(ButtonStyle.Primary).setDisabled(page === pages.length - 1);

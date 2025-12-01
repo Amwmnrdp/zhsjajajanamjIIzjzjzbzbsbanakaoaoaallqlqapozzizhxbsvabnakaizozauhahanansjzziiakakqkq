@@ -14,13 +14,13 @@ async function execute(interaction, langCode) {
     let info = parseEmoji(emoji);
 
     if (!info.id) {
-        const embed = new EmbedBuilder().setDescription('❌ ' + await t('Invalid emoji!', langCode)).setColor('#FF0000');
+        const embed = new EmbedBuilder().setDescription('❌ ' + await t('Invalid emoji!', langCode)).setColor('#FF0000').setFooter({ text: `${interaction.user.displayName} (@${interaction.user.username})`, iconURL: interaction.user.displayAvatarURL() });
         await interaction.reply({ embeds: [embed] });
         return;
     }
 
     if (interaction.guild.emojis.cache.find(e => e.name === info.name)) {
-        const embed = new EmbedBuilder().setDescription('⚠️ ' + emoji + ' ' + await t('already exists!', langCode)).setColor('#FF9900');
+        const embed = new EmbedBuilder().setDescription('⚠️ ' + emoji + ' ' + await t('already exists!', langCode)).setColor('#FF9900').setFooter({ text: `${interaction.user.displayName} (@${interaction.user.username})`, iconURL: interaction.user.displayAvatarURL() });
         await interaction.reply({ embeds: [embed] });
         return;
     }
@@ -29,10 +29,10 @@ async function execute(interaction, langCode) {
         let type = info.animated ? '.gif' : '.png';
         let url = `https://cdn.discordapp.com/emojis/${info.id + type}`;
         const emj = await interaction.guild.emojis.create({ attachment: url, name: name || info.name, reason: `By ${interaction.user.tag}` });
-        const embed = new EmbedBuilder().setDescription('✅ ' + await t('Added!', langCode) + ' ' + emj).setColor('#00FF00');
+        const embed = new EmbedBuilder().setDescription('✅ ' + await t('Added!', langCode) + ' ' + emj).setColor('#00FF00').setFooter({ text: `${interaction.user.displayName} (@${interaction.user.username})`, iconURL: interaction.user.displayAvatarURL() });
         await interaction.reply({ embeds: [embed] });
     } catch (error) {
-        const embed = new EmbedBuilder().setDescription('❌ ' + await t('Error:', langCode) + ' ' + error.message).setColor('#FF0000');
+        const embed = new EmbedBuilder().setDescription('❌ ' + await t('Error:', langCode) + ' ' + error.message).setColor('#FF0000').setFooter({ text: `${interaction.user.displayName} (@${interaction.user.username})`, iconURL: interaction.user.displayAvatarURL() });
         await interaction.reply({ embeds: [embed] });
     }
 }

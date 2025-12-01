@@ -13,7 +13,7 @@ async function execute(interaction, langCode, convertedEmojisToStickers) {
     const match = emojiInput.match(/<(a)?:(\w+):(\d+)>/);
 
     if (!match) {
-        const embed = new EmbedBuilder().setDescription('❌ ' + await t('Invalid emoji!', langCode)).setColor('#FF0000');
+        const embed = new EmbedBuilder().setDescription('❌ ' + await t('Invalid emoji!', langCode)).setColor('#FF0000').setFooter({ text: `${interaction.user.displayName} (@${interaction.user.username})`, iconURL: interaction.user.displayAvatarURL() });
         await interaction.reply({ embeds: [embed] });
         return;
     }
@@ -32,7 +32,7 @@ async function execute(interaction, langCode, convertedEmojisToStickers) {
             .setDescription(await t('This emoji has already been converted to a sticker!', langCode) + `\n\n**${await t('Existing Sticker Name:', langCode)}** ${stickerInfo.stickerName}\n**${await t('Sticker ID:', langCode)}** ${stickerInfo.stickerId}\n\n${await t('Delete the sticker to convert again.', langCode)}`)
             .setThumbnail(stickerUrl)
             .setColor('#FF9900')
-            .setFooter({ text: await t('This conversion is already done.', langCode) });
+            .setFooter({ text: await t('This conversion is already done.', langCode) + ` • ${interaction.user.displayName} (@${interaction.user.username})`, iconURL: interaction.user.displayAvatarURL() });
         await interaction.reply({ embeds: [embed] });
         return;
     }
@@ -47,7 +47,7 @@ async function execute(interaction, langCode, convertedEmojisToStickers) {
             .setDescription(await t('A sticker with this name already exists!', langCode) + `\n\n**${await t('Existing Sticker Name:', langCode)}** ${duplicateByName.name}\n**${await t('Sticker ID:', langCode)}** ${duplicateByName.id}`)
             .setThumbnail(stickerUrl)
             .setColor('#FF9900')
-            .setFooter({ text: await t('Please choose a different name.', langCode) });
+            .setFooter({ text: await t('Please choose a different name.', langCode) + ` • ${interaction.user.displayName} (@${interaction.user.username})`, iconURL: interaction.user.displayAvatarURL() });
         await interaction.reply({ embeds: [embed] });
         return;
     }
@@ -65,7 +65,7 @@ async function execute(interaction, langCode, convertedEmojisToStickers) {
             .setDescription(await t('Successfully converted emoji to sticker!', langCode) + `\n\n**${await t('Sticker Name:', langCode)}** ${stickerName}\n**${await t('Sticker ID:', langCode)}** ${sticker.id}`)
             .setImage(emojiUrl)
             .setColor('#00FF00')
-            .setFooter({ text: await t('You can now use this sticker in your server!', langCode) });
+            .setFooter({ text: await t('You can now use this sticker in your server!', langCode) + ` • ${interaction.user.displayName} (@${interaction.user.username})`, iconURL: interaction.user.displayAvatarURL() });
 
         await interaction.reply({ embeds: [embed] });
         convertedEmojisToStickers.set(trackingKey, {
@@ -81,7 +81,8 @@ async function execute(interaction, langCode, convertedEmojisToStickers) {
             await t('Error:', langCode) + ' ' + error.message;
         const embed = new EmbedBuilder()
             .setDescription(`❌ ${errorMsg}`)
-            .setColor('#FF0000');
+            .setColor('#FF0000')
+            .setFooter({ text: `${interaction.user.displayName} (@${interaction.user.username})`, iconURL: interaction.user.displayAvatarURL() });
         await interaction.reply({ embeds: [embed] });
         console.error(`⚠️ Discord Error in emoji_to_sticker:`, error.code, error.message);
     }
