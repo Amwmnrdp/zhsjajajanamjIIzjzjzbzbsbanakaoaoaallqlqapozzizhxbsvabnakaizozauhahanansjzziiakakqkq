@@ -52,18 +52,29 @@ async function execute(interaction, langCode, client) {
         let description = '';
         const rows = [];
         let buttonIndex = 0;
+        const maxDescriptionLength = 3500; // Leave room for safety
 
         Object.keys(groupedByName).forEach(name => {
+            if (description.length > maxDescriptionLength) return;
+            
             const emojiList = groupedByName[name].slice(0, 10);
-            description += `**${name}** (${emojiList.length} variant${emojiList.length > 1 ? 's' : ''}):\n`;
-
+            const section = `**${name}** (${emojiList.length} variant${emojiList.length > 1 ? 's' : ''}):\n`;
+            
+            if (description.length + section.length > maxDescriptionLength) return;
+            
+            description += section;
             emojiList.forEach((emoji, idx) => {
-                description += `${idx + 1}️⃣ ${emoji} • ${emoji.guild.name}\n`;
+                const line = `${idx + 1}️⃣ ${emoji} • ${emoji.guild.name}\n`;
+                if (description.length + line.length <= maxDescriptionLength) {
+                    description += line;
+                }
             });
             description += '\n';
 
             let currentRow = null;
             emojiList.forEach((emoji, idx) => {
+                if (rows.length >= 4) return; // Max 4 rows for emoji buttons (leave room for done/cancel)
+                
                 if (buttonIndex % 5 === 0) {
                     currentRow = new ActionRowBuilder();
                     rows.push(currentRow);
@@ -95,21 +106,34 @@ async function execute(interaction, langCode, client) {
         const actionRow = new ActionRowBuilder().addComponents(doneButton, cancelButton);
         rows.push(actionRow);
 
+        const displayText = description.length > 0 ? description : await t('No emojis to display.', langCode);
+        
         const embed = new EmbedBuilder()
             .setTitle('🔍 ' + await t('Emoji Search Results', langCode))
-            .setDescription(description)
+            .setDescription(displayText.length > 0 ? displayText : '*None*')
             .setColor('#00FFFF')
+            .addFields({ name: await t('Total Found', langCode), value: `${foundEmojis.length}`, inline: true })
             .setFooter({ text: await t('Click a button to add an emoji. 2-minute timeout.', langCode) + ` • ${interaction.user.displayName} (@${interaction.user.username})`, iconURL: interaction.user.displayAvatarURL() });
 
-        const msg = await interaction.reply({ embeds: [embed], components: rows, fetchReply: true });
-        return msg;
+        try {
+            const msg = await interaction.reply({ embeds: [embed], components: rows, fetchReply: true });
+            return msg;
+        } catch (error) {
+            console.error('⚠️ Error sending emoji search reply:', error.message);
+            const errorEmbed = new EmbedBuilder()
+                .setTitle('❌ ' + await t('Error', langCode))
+                .setDescription(await t('Could not display search results. Try a more specific search.', langCode))
+                .setColor('#FF0000');
+            await interaction.reply({ embeds: [errorEmbed], ephemeral: true });
+            return null;
+        }
     };
 
     const searchTerm = interaction.options.getString('search').toLowerCase();
     const foundEmojis = await performSearch(searchTerm);
     const msg = await displayResults(foundEmojis, searchTerm);
 
-    if (foundEmojis.length === 0) return;
+    if (!msg || foundEmojis.length === 0) return;
 
     const emojiMap = new Map();
     let buttonIndex = 0;
