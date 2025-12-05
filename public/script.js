@@ -29,6 +29,8 @@ const removeImageBtn = document.getElementById('removeImage');
 let currentUser = null;
 let isAdmin = false;
 let uploadedImageData = null;
+let timerInterval = null;
+let verificationExpiresAt = null;
 
 let scrollPosition = 0;
 
@@ -102,11 +104,6 @@ tabBtns.forEach(btn => {
     });
 });
 
-if (activateBtn) {
-    activateBtn.addEventListener('click', () => {
-        window.location.href = '/auth/discord';
-    });
-}
 
 async function fetchStats() {
     try {
@@ -127,10 +124,14 @@ async function fetchUserProfile() {
         if (data.discord_id) {
             currentUser = data;
             isAdmin = data.is_admin || false;
+            verificationExpiresAt = data.expires_at || null;
         }
         
         const avatarEl = document.getElementById('userAvatar');
         const nameEl = document.getElementById('userName');
+        const adminPanelLink = document.getElementById('adminPanelLink');
+        const activationCard = document.getElementById('activationCard');
+        const verifiedCard = document.getElementById('verifiedCard');
         
         if (data.avatar) {
             avatarEl.src = data.avatar;
@@ -139,11 +140,66 @@ async function fetchUserProfile() {
             avatarEl.src = 'https://cdn.discordapp.com/embed/avatars/0.png';
         }
         nameEl.textContent = data.username || 'Guest';
+        
+        if (adminPanelLink && isAdmin) {
+            adminPanelLink.style.display = 'block';
+        }
+        
+        if (currentUser && verificationExpiresAt && activationCard && verifiedCard) {
+            const now = Date.now();
+            if (verificationExpiresAt > now) {
+                activationCard.style.display = 'none';
+                verifiedCard.style.display = 'block';
+                startVerificationTimer();
+            } else {
+                activationCard.style.display = 'block';
+                verifiedCard.style.display = 'none';
+            }
+        }
     } catch (error) {
         console.error('Error fetching user profile:', error);
         document.getElementById('userAvatar').src = 'https://cdn.discordapp.com/embed/avatars/0.png';
         document.getElementById('userName').textContent = 'Guest';
     }
+}
+
+function startVerificationTimer() {
+    if (timerInterval) clearInterval(timerInterval);
+    
+    function updateTimer() {
+        const now = Date.now();
+        const remaining = verificationExpiresAt - now;
+        
+        const timerDisplay = document.getElementById('verificationTimer');
+        const hoursEl = document.getElementById('timerHours');
+        const minutesEl = document.getElementById('timerMinutes');
+        const secondsEl = document.getElementById('timerSeconds');
+        
+        if (remaining <= 0) {
+            if (timerDisplay) timerDisplay.classList.add('timer-expired');
+            if (hoursEl) hoursEl.textContent = '00';
+            if (minutesEl) minutesEl.textContent = '00';
+            if (secondsEl) secondsEl.textContent = '00';
+            clearInterval(timerInterval);
+            
+            const activationCard = document.getElementById('activationCard');
+            const verifiedCard = document.getElementById('verifiedCard');
+            if (activationCard) activationCard.style.display = 'block';
+            if (verifiedCard) verifiedCard.style.display = 'none';
+            return;
+        }
+        
+        const hours = Math.floor(remaining / (1000 * 60 * 60));
+        const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((remaining % (1000 * 60)) / 1000);
+        
+        if (hoursEl) hoursEl.textContent = String(hours).padStart(2, '0');
+        if (minutesEl) minutesEl.textContent = String(minutes).padStart(2, '0');
+        if (secondsEl) secondsEl.textContent = String(seconds).padStart(2, '0');
+    }
+    
+    updateTimer();
+    timerInterval = setInterval(updateTimer, 1000);
 }
 
 document.querySelectorAll('.close').forEach(closeBtn => {
