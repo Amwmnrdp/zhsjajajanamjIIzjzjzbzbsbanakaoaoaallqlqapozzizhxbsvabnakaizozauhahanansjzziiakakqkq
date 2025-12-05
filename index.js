@@ -62,9 +62,16 @@ loadServerLanguages();
 
 client.once('ready', async () => {
     console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
-    console.log(`✅ Bot: ${client.user.tag}`);
-    console.log(`✅ Status: Online and Ready!`);
-    console.log(`📊 Servers: ${client.guilds.cache.size}`);
+    console.log(`I want you to delete all the messages on the website under the Active section, and add a button called “Activate Your Account” or “Activate Bot” — choose whichever is better.
+‎When the user clicks on it, they should be redirected to the Discord 2FA (OAuth2) authorization page, where the bot’s name appears, just like other verification bots.
+‎
+‎I also want you to add a condition so that no command works unless the user has verified their account.
+‎If they use any command without being verified, they should receive an embed message (visible only to them) telling them that they must verify their account before using commands, and the message should include the website link.
+‎
+‎Additionally, make the system require re-verification every 5 hours after their last verification.
+‎
+‎And also, modify the Statistics section by adding a counter that counts the number of users who have activated their accounts.`);
+    
     console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
 
     client.user.setPresence({
