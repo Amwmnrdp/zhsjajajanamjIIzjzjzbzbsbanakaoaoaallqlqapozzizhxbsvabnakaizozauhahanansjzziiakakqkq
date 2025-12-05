@@ -30,6 +30,10 @@ const LEGACY_LANGUAGE_MAP = {
 
 const COMMAND_DEFINITIONS = [
     {
+        name: 'help',
+        description: 'Get help about all ProEmoji commands'
+    },
+    {
         name: 'permission',
         description: 'Set permissions for emoji suggestions'
     },

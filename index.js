@@ -47,6 +47,7 @@ const liststicker = require('./src/commands/sticker/liststicker');
 const ping = require('./src/commands/storage/ping');
 const permission = require('./src/commands/storage/permission');
 const language = require('./src/commands/storage/language');
+const help = require('./src/commands/storage/help');
 
 const client = new Client({
     intents: [
@@ -164,6 +165,7 @@ client.on('interactionCreate', async interaction => {
 
     try {
         if (interaction.commandName === 'ping') await ping.execute(interaction);
+        else if (interaction.commandName === 'help') await help.execute(interaction, langCode);
         else if (interaction.commandName === 'permission') await permission.execute(interaction, langCode);
         else if (interaction.commandName === 'emoji_search') await emojisearch.execute(interaction, langCode, client);
         else if (interaction.commandName === 'suggestemojis') await suggestemojis.execute(interaction, langCode, client);
@@ -239,59 +241,6 @@ client.on('messageCreate', async message => {
                 await message.reply({ embeds: [embed] }).then(m => setTimeout(() => m.delete().catch(() => {}), 15000));
                 return;
             }
-        }
-
-        if (message.content.startsWith(prefix + 'help')) {
-            const checkDM = await t('Check your DM', langCode);
-            message.channel.send(`**${checkDM}**`).then(m => setTimeout(() => m.delete(), 5000));
-
-            const helpContent = `**${await t('Welcome, this is my help menu', langCode)}**
-⌄ـــــــــــــــــــــــــــProEmojiـــــــــــــــــــــــــــــ⌄
-
-${await t('The prefix of the bot is', langCode)} **[ + ]**
-
-⌄ـــــــــــــــــــــــــــProEmojiـــــــــــــــــــــــــــــ⌄
-
-${await t('If you do not have Nitro you can write this command', langCode)} **+suggestemojis** ${await t('so that the bot will suggest emojis to you from different servers', langCode)}
-
-⌄ـــــــــــــــــــــــــــProEmojiـــــــــــــــــــــــــــــ⌄
-
-${await t('You can use this slash command', langCode)} **/image_to_emoji** ${await t('to convert an image URL into an emoji and save it on your server', langCode)}
-
-⌄ـــــــــــــــــــــــــــProEmojiـــــــــــــــــــــــــــــ⌄
-
-${await t('You can add an emoji using this command', langCode)} **+addemoji** ${await t('and you will be able to add an emoji with its original name', langCode)}
-
-⌄ـــــــــــــــــــــــــــProEmojiـــــــــــــــــــــــــــــ⌄
-
-${await t('You can add an emoji and change its name using this Slash Command', langCode)} **/addemoji**
-
-⌄ـــــــــــــــــــــــــــProEmojiـــــــــــــــــــــــــــــ⌄
-
-${await t('If you want to rename an emoji you can use this slash command', langCode)} **/rename_emoji** ${await t('and the emoji name will be changed', langCode)}
-
-⌄ـــــــــــــــــــــــــــProEmojiـــــــــــــــــــــــــــــ⌄
-
-${await t('You can convert an emoji to a sticker using this slash command', langCode)} **/emoji_to_sticker** ${await t('and the emoji will be turned into a beautiful sticker!', langCode)}
-
-⌄ـــــــــــــــــــــــــــProEmojiـــــــــــــــــــــــــــــ⌄
-
-${await t('You can convert an image to a sticker using this slash command', langCode)} **/image_to_sticker** ${await t('and the image will be turned into a beautiful sticker!', langCode)}
-
-⌄ـــــــــــــــــــــــــــProEmojiـــــــــــــــــــــــــــــ⌄
-
-${await t('You can delete a sticker using this slash command', langCode)} **/delete_sticker** ${await t('and then reply with the sticker you want to delete!', langCode)}
-
-⌄ـــــــــــــــــــــــــــProEmojiـــــــــــــــــــــــــــــ⌄
-
-${await t('You can convert a sticker to an emoji using this slash command', langCode)} **/sticker_to_emoji** ${await t('and then reply with the sticker you want to convert!', langCode)}`;
-
-            const embed = new EmbedBuilder()
-                .setTitle('📖 ' + await t('ProEmoji Help', langCode))
-                .setDescription(helpContent)
-                .setColor('#0099ff');
-
-            await message.author.send({ embeds: [embed] }).catch(async () => message.reply('❌ ' + await t('Could not send DM!', langCode)));
         }
 
         if (message.content === 'نعم' || message.content.toLowerCase() === 'yes') {
