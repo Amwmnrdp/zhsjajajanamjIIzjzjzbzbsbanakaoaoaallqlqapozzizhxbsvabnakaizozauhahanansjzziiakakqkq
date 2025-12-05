@@ -235,8 +235,11 @@ function updateVerificationStatus() {
         activateBtn.disabled = false;
         activateBtn.style.opacity = '1';
         activateBtn.style.cursor = 'pointer';
+        activateBtn.textContent = '🔗 Activate Your Account';
         const timerDiv = document.getElementById('verificationTimer');
         if (timerDiv) timerDiv.remove();
+        const resetBtn = document.getElementById('resetBtn');
+        if (resetBtn) resetBtn.remove();
         return;
     }
 
@@ -253,6 +256,38 @@ function updateVerificationStatus() {
     activateBtn.disabled = true;
     activateBtn.style.opacity = '0.6';
     activateBtn.style.cursor = 'not-allowed';
+
+    // Add reset button if not already there
+    if (!document.getElementById('resetBtn')) {
+        const resetBtn = document.createElement('button');
+        resetBtn.id = 'resetBtn';
+        resetBtn.textContent = 'Reset Verification';
+        resetBtn.style.cssText = `
+            display: block;
+            margin-top: 15px;
+            margin-left: auto;
+            margin-right: auto;
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        `;
+        resetBtn.addEventListener('mouseenter', () => {
+            resetBtn.style.background = 'rgba(239, 68, 68, 0.3)';
+        });
+        resetBtn.addEventListener('mouseleave', () => {
+            resetBtn.style.background = 'rgba(239, 68, 68, 0.2)';
+        });
+        resetBtn.addEventListener('click', () => {
+            localStorage.removeItem('proemoji_verified_time');
+            updateVerificationStatus();
+        });
+        activateBtn.parentElement.appendChild(resetBtn);
+    }
 
     let timerDiv = document.getElementById('verificationTimer');
     if (!timerDiv) {
