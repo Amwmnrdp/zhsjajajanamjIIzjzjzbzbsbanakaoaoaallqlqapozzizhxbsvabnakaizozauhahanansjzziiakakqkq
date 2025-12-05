@@ -1,5 +1,5 @@
 entrypoint = "index.js"
-modules = ["nodejs-20", "web", "nix", "python-3.11"]
+modules = ["nodejs-20", "web", "nix"]
 hidden = [".config", "package-lock.json"]
 
 [gitHubImport]
@@ -39,6 +39,10 @@ externalPort = 3000
 [[ports]]
 localPort = 38621
 externalPort = 3001
+
+[[ports]]
+localPort = 45995
+externalPort = 3003
 
 [workflows]
 runButton = "Project"
