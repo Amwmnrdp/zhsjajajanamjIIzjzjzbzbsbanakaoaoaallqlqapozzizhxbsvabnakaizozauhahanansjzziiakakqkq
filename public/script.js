@@ -203,15 +203,24 @@ async function loadSuggestions() {
     }
 }
 
-// Load Server Count
+// Load Server Count and Verified Users
 async function loadServerCount() {
     try {
         const response = await fetch('/api/stats');
         const stats = await response.json();
         document.getElementById('serverCount').textContent = stats.servers;
+        document.getElementById('verifiedCount').textContent = stats.verifiedUsers || 0;
     } catch (error) {
         console.error('Error loading stats:', error);
     }
+}
+
+// Activate Account Button
+const activateBtn = document.getElementById('activateBtn');
+if (activateBtn) {
+    activateBtn.addEventListener('click', () => {
+        window.location.href = '/auth/discord';
+    });
 }
 
 // Show Notification

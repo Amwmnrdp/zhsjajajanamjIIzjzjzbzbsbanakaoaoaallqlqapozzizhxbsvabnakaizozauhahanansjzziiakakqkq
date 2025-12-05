@@ -1,5 +1,5 @@
 entrypoint = "index.js"
-modules = ["nodejs-20", "web", "nix"]
+modules = ["nodejs-20", "web", "nix", "python-3.11"]
 hidden = [".config", "package-lock.json"]
 
 [gitHubImport]
@@ -18,9 +18,18 @@ ignorePorts = false
 
 [agent]
 expertMode = true
+integrations = ["discord:1.0.0"]
 
 [[ports]]
 localPort = 3000
+externalPort = 80
+
+[[ports]]
+localPort = 34509
+externalPort = 3000
+
+[[ports]]
+localPort = 5000
 externalPort = 80
 
 [workflows]
@@ -39,9 +48,10 @@ args = "ProEmoji Bot"
 name = "ProEmoji Bot"
 author = "agent"
 
+[workflows.workflow.metadata]
+outputType = "webview"
+
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "node index.js"
-
-[workflows.workflow.metadata]
-outputType = "console"
+waitForPort = 5000

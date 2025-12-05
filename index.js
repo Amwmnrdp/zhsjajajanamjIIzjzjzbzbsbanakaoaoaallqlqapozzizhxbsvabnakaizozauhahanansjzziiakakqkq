@@ -10,6 +10,16 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Import submissions utility
 const { getHelp, addHelp, getSuggestions, addSuggestion } = require('./src/utils/submissions');
 
+// Import verified users utility
+const { verifyUser, isUserVerified, getVerificationStatus, getVerifiedUsersCount, VERIFICATION_DURATION } = require('./src/utils/verifiedUsers');
+
+// Discord OAuth2 Configuration
+const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID;
+const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET;
+const REDIRECT_URI = process.env.REPLIT_DEV_DOMAIN 
+    ? `https://${process.env.REPLIT_DEV_DOMAIN}/auth/discord/callback`
+    : 'http://localhost:3000/auth/discord/callback';
+
 // Import utilities
 const { SUPPORTED_LANGUAGES, COMMAND_DEFINITIONS } = require('./src/utils/constants');
 const { readServersFile, writeServersFile } = require('./src/utils/storage');
@@ -105,6 +115,30 @@ client.on('guildDelete', guild => {
     console.log(`❌ Left: ${guild.name}`);
 });
 
+// Website URL for verification
+const WEBSITE_URL = process.env.REPLIT_DEV_DOMAIN 
+    ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+    : 'http://localhost:3000';
+
+// Helper function to check verification and send error message
+async function checkVerification(interaction, langCode) {
+    const userId = interaction.user.id;
+    
+    if (!isUserVerified(userId)) {
+        const embed = new EmbedBuilder()
+            .setTitle('🔐 ' + await t('Verification Required', langCode))
+            .setDescription(await t('You must verify your Discord account before using commands.', langCode) + 
+                `\n\n**${await t('Verification is required every 5 hours for security.', langCode)}**\n\n` +
+                `🔗 **${await t('Click here to verify:', langCode)}** ${WEBSITE_URL}/#activation`)
+            .setColor('#FF6B6B')
+            .setFooter({ text: await t('This message is only visible to you.', langCode) });
+        
+        await interaction.reply({ embeds: [embed], ephemeral: true });
+        return false;
+    }
+    return true;
+}
+
 client.on('interactionCreate', async interaction => {
     if (interaction.isStringSelectMenu() && interaction.customId === 'language_select') {
         const langCode = interaction.values[0];
@@ -121,6 +155,12 @@ client.on('interactionCreate', async interaction => {
     
     if (!interaction.isCommand()) return;
     const langCode = getServerLanguage(interaction.guild.id);
+
+    // Check verification for all commands except ping (allow ping without verification)
+    if (interaction.commandName !== 'ping') {
+        const isVerified = await checkVerification(interaction, langCode);
+        if (!isVerified) return;
+    }
 
     try {
         if (interaction.commandName === 'ping') await ping.execute(interaction);
@@ -180,9 +220,27 @@ client.on('interactionCreate', async interaction => {
 
 client.on('messageCreate', async message => {
     if (message.author.bot) return;
+    if (!message.guild) return;
     const langCode = getServerLanguage(message.guild.id);
 
     try {
+        // Check verification for message commands
+        if (message.content.startsWith(prefix)) {
+            const userId = message.author.id;
+            if (!isUserVerified(userId)) {
+                const embed = new EmbedBuilder()
+                    .setTitle('🔐 ' + await t('Verification Required', langCode))
+                    .setDescription(await t('You must verify your Discord account before using commands.', langCode) + 
+                        `\n\n**${await t('Verification is required every 5 hours for security.', langCode)}**\n\n` +
+                        `🔗 **${await t('Click here to verify:', langCode)}** ${WEBSITE_URL}/#activation`)
+                    .setColor('#FF6B6B')
+                    .setFooter({ text: await t('This message is only visible to you.', langCode) });
+                
+                await message.reply({ embeds: [embed] }).then(m => setTimeout(() => m.delete().catch(() => {}), 15000));
+                return;
+            }
+        }
+
         if (message.content.startsWith(prefix + 'help')) {
             const checkDM = await t('Check your DM', langCode);
             message.channel.send(`**${checkDM}**`).then(m => setTimeout(() => m.delete(), 5000));
@@ -412,7 +470,79 @@ app.get('/api/health', (req, res) => {
 
 // Stats endpoint
 app.get('/api/stats', (req, res) => {
-    res.json({ servers: client.guilds.cache.size });
+    res.json({ 
+        servers: client.guilds.cache.size,
+        verifiedUsers: getVerifiedUsersCount()
+    });
+});
+
+// Discord OAuth2 - Redirect to Discord authorization
+app.get('/auth/discord', (req, res) => {
+    if (!DISCORD_CLIENT_ID) {
+        return res.status(500).send('Discord OAuth2 not configured. Please set DISCORD_CLIENT_ID.');
+    }
+    
+    const params = new URLSearchParams({
+        client_id: DISCORD_CLIENT_ID,
+        redirect_uri: REDIRECT_URI,
+        response_type: 'code',
+        scope: 'identify'
+    });
+    
+    res.redirect(`https://discord.com/api/oauth2/authorize?${params.toString()}`);
+});
+
+// Discord OAuth2 Callback
+app.get('/auth/discord/callback', async (req, res) => {
+    const code = req.query.code;
+    
+    if (!code) {
+        return res.redirect('/verification-failed.html');
+    }
+    
+    try {
+        const tokenResponse = await fetch('https://discord.com/api/oauth2/token', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: new URLSearchParams({
+                client_id: DISCORD_CLIENT_ID,
+                client_secret: DISCORD_CLIENT_SECRET,
+                grant_type: 'authorization_code',
+                code: code,
+                redirect_uri: REDIRECT_URI
+            })
+        });
+        
+        const tokenData = await tokenResponse.json();
+        
+        if (!tokenData.access_token) {
+            console.error('OAuth2 token error:', tokenData);
+            return res.redirect('/verification-failed.html');
+        }
+        
+        const userResponse = await fetch('https://discord.com/api/users/@me', {
+            headers: {
+                Authorization: `Bearer ${tokenData.access_token}`
+            }
+        });
+        
+        const userData = await userResponse.json();
+        
+        if (!userData.id) {
+            console.error('User data error:', userData);
+            return res.redirect('/verification-failed.html');
+        }
+        
+        verifyUser(userData.id, userData.username);
+        console.log(`User verified: ${userData.username} (${userData.id})`);
+        
+        res.redirect('/verification-success.html');
+    } catch (error) {
+        console.error('OAuth2 callback error:', error);
+        res.redirect('/verification-failed.html');
+    }
 });
 
 // Help endpoints
@@ -451,8 +581,8 @@ app.post('/api/suggestions', (req, res) => {
     }
 });
 
-const PORT = 3000;
-app.listen(PORT, () => {
+const PORT = 5000;
+app.listen(PORT, '0.0.0.0', () => {
     console.log(`🌐 Server running on port ${PORT}`);
 });
 
