@@ -18,12 +18,26 @@ const suggestionForm = document.getElementById('suggestionForm');
 const helpList = document.getElementById('helpList');
 const suggestionsList = document.getElementById('suggestionsList');
 
+// Store scroll position
+let scrollPosition = 0;
+
 // Hamburger Menu Toggle
 hamburgerBtn.addEventListener('click', () => {
+    const isOpening = !sidebar.classList.contains('active');
+    
+    if (isOpening) {
+        scrollPosition = window.pageYOffset;
+        document.body.classList.add('menu-open');
+        document.body.style.top = `-${scrollPosition}px`;
+    } else {
+        document.body.classList.remove('menu-open');
+        document.body.style.top = '';
+        window.scrollTo(0, scrollPosition);
+    }
+    
     hamburgerBtn.classList.toggle('active');
     sidebar.classList.toggle('active');
     overlay.classList.toggle('active');
-    document.body.classList.toggle('menu-open');
 });
 
 // Close Menu
@@ -32,6 +46,8 @@ overlay.addEventListener('click', () => {
     sidebar.classList.remove('active');
     overlay.classList.remove('active');
     document.body.classList.remove('menu-open');
+    document.body.style.top = '';
+    window.scrollTo(0, scrollPosition);
 });
 
 // Navigation
@@ -39,13 +55,17 @@ menuLinks.forEach(link => {
     link.addEventListener('click', (e) => {
         e.preventDefault();
         const section = link.getAttribute('data-section');
-        showSection(section);
         
-        // Close menu
+        // Close menu and restore scroll
         hamburgerBtn.classList.remove('active');
         sidebar.classList.remove('active');
         overlay.classList.remove('active');
         document.body.classList.remove('menu-open');
+        document.body.style.top = '';
+        window.scrollTo(0, scrollPosition);
+        
+        // Then show section
+        showSection(section);
     });
 });
 
