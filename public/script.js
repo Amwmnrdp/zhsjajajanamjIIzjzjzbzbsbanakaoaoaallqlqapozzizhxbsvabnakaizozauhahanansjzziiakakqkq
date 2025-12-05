@@ -23,6 +23,7 @@ hamburgerBtn.addEventListener('click', () => {
     hamburgerBtn.classList.toggle('active');
     sidebar.classList.toggle('active');
     overlay.classList.toggle('active');
+    document.body.classList.toggle('menu-open');
 });
 
 // Close Menu
@@ -30,6 +31,7 @@ overlay.addEventListener('click', () => {
     hamburgerBtn.classList.remove('active');
     sidebar.classList.remove('active');
     overlay.classList.remove('active');
+    document.body.classList.remove('menu-open');
 });
 
 // Navigation
@@ -43,6 +45,7 @@ menuLinks.forEach(link => {
         hamburgerBtn.classList.remove('active');
         sidebar.classList.remove('active');
         overlay.classList.remove('active');
+        document.body.classList.remove('menu-open');
     });
 });
 
