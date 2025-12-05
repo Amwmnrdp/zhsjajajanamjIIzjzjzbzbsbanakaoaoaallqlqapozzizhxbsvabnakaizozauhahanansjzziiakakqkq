@@ -249,6 +249,8 @@ function updateVerificationStatus() {
 
     if (now > expiresAt) {
         localStorage.removeItem('proemoji_verified_time');
+        localStorage.removeItem('proemoji_user_profile');
+        resetUserProfile();
         updateVerificationStatus();
         return;
     }
@@ -284,6 +286,8 @@ function updateVerificationStatus() {
         });
         resetBtn.addEventListener('click', () => {
             localStorage.removeItem('proemoji_verified_time');
+            localStorage.removeItem('proemoji_user_profile');
+            resetUserProfile();
             updateVerificationStatus();
         });
         activateBtn.parentElement.appendChild(resetBtn);
@@ -317,6 +321,8 @@ function updateVerificationStatus() {
         if (remainingTime <= 0) {
             clearInterval(interval);
             localStorage.removeItem('proemoji_verified_time');
+            localStorage.removeItem('proemoji_user_profile');
+            resetUserProfile();
             updateVerificationStatus();
             return;
         }
@@ -385,22 +391,40 @@ document.querySelectorAll('.feature-card, .command, .lang-badge, .stat-card').fo
     observer.observe(el);
 });
 
-// Load User Profile
-async function loadUserProfile() {
-    try {
-        const response = await fetch('/api/user-profile');
-        if (!response.ok) return;
-        
-        const user = await response.json();
-        const userAvatar = document.getElementById('userAvatar');
-        const userName = document.getElementById('userName');
-        
-        if (userAvatar && userName && user.avatar && user.username) {
+// Load User Profile from localStorage
+function loadUserProfile() {
+    const userAvatar = document.getElementById('userAvatar');
+    const userName = document.getElementById('userName');
+    
+    if (!userAvatar || !userName) return;
+    
+    const userProfileStr = localStorage.getItem('proemoji_user_profile');
+    const verifiedTime = localStorage.getItem('proemoji_verified_time');
+    
+    if (userProfileStr && verifiedTime) {
+        try {
+            const user = JSON.parse(userProfileStr);
             userAvatar.src = user.avatar;
             userName.textContent = user.username;
+            userAvatar.style.display = 'block';
+        } catch (e) {
+            console.log('Error loading user profile');
+            resetUserProfile();
         }
-    } catch (error) {
-        console.log('User profile not available');
+    } else {
+        resetUserProfile();
+    }
+}
+
+function resetUserProfile() {
+    const userAvatar = document.getElementById('userAvatar');
+    const userName = document.getElementById('userName');
+    
+    if (userAvatar) {
+        userAvatar.src = 'https://cdn.discordapp.com/embed/avatars/0.png';
+    }
+    if (userName) {
+        userName.textContent = 'Guest';
     }
 }
 

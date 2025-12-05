@@ -505,7 +505,17 @@ app.get('/auth/discord/callback', async (req, res) => {
         verifyUser(userData.id, userData.username);
         console.log(`User verified: ${userData.username} (${userData.id})`);
         
-        res.redirect('/verification-success.html');
+        const avatarUrl = userData.avatar 
+            ? `https://cdn.discordapp.com/avatars/${userData.id}/${userData.avatar}.png?size=128`
+            : `https://cdn.discordapp.com/embed/avatars/${parseInt(userData.discriminator || '0') % 5}.png`;
+        
+        const userInfo = encodeURIComponent(JSON.stringify({
+            username: userData.username,
+            avatar: avatarUrl,
+            id: userData.id
+        }));
+        
+        res.redirect(`/verification-success.html?user=${userInfo}`);
     } catch (error) {
         console.error('OAuth2 callback error:', error);
         res.redirect('/verification-failed.html');

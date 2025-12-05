@@ -54,6 +54,18 @@
 
     <script>
         localStorage.setItem('proemoji_verified_time', Date.now().toString());
+        
+        const urlParams = new URLSearchParams(window.location.search);
+        const userInfo = urlParams.get('user');
+        if (userInfo) {
+            try {
+                const user = JSON.parse(decodeURIComponent(userInfo));
+                localStorage.setItem('proemoji_user_profile', JSON.stringify(user));
+            } catch (e) {
+                console.error('Error parsing user info:', e);
+            }
+        }
+        
         setTimeout(() => {
             window.location.href = '/#activation';
         }, 2000);
