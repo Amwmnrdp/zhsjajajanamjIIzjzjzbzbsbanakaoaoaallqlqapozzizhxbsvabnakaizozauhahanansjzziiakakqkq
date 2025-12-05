@@ -71,10 +71,36 @@ body {
     height: 100vh;
     background: linear-gradient(135deg, #1a1f3a 0%, #16213e 100%);
     border-right: 2px solid rgba(102, 126, 234, 0.3);
-    padding-top: 80px;
+    padding-top: 20px;
     z-index: 999;
     transition: left 0.3s ease;
     overflow-y: auto;
+}
+
+/* User Profile Section */
+.user-profile {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 15px 20px;
+    margin-bottom: 20px;
+    border-bottom: 1px solid rgba(102, 126, 234, 0.2);
+}
+
+.user-avatar {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    border: 2px solid rgba(102, 126, 234, 0.5);
+    object-fit: cover;
+}
+
+.user-name {
+    color: #e0e0e0;
+    font-weight: 600;
+    font-size: 0.9em;
+    word-break: break-word;
+    flex: 1;
 }
 
 .sidebar.active {
@@ -94,6 +120,12 @@ body {
     font-weight: 500;
     transition: all 0.3s ease;
     border-left: 4px solid transparent;
+}
+
+.menu-link i {
+    margin-right: 10px;
+    color: #667eea;
+    min-width: 20px;
 }
 
 .menu-link:hover {
@@ -635,6 +667,20 @@ footer {
     padding: 40px 20px;
     color: #666;
     border-top: 1px solid rgba(102, 126, 234, 0.2);
+}
+
+/* Decorative Elements Blur */
+.help-item::before,
+.suggestion-item::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 10px;
+    background: inherit;
+    filter: blur(2px);
+    opacity: 0.8;
 }
 
 /* Responsive */

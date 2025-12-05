@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ProEmoji Bot - Dashboard</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
     <!-- Hamburger Menu -->
@@ -18,13 +19,17 @@
 
     <!-- Sidebar Menu -->
     <nav class="sidebar" id="sidebar">
+        <div class="user-profile">
+            <img id="userAvatar" src="" alt="User Avatar" class="user-avatar">
+            <span id="userName" class="user-name">Loading...</span>
+        </div>
         <ul class="menu-list">
-            <li><a href="#home" class="menu-link" data-section="home">🏠 Home</a></li>
-            <li><a href="#activation" class="menu-link" data-section="activation">✅ Activation</a></li>
-            <li><a href="#statistics" class="menu-link" data-section="statistics">📊 Statistics</a></li>
-            <li><a href="#commands" class="menu-link" data-section="commands">⚡ Commands</a></li>
-            <li><a href="#help" class="menu-link" data-section="help">❓ Help</a></li>
-            <li><a href="#suggestions" class="menu-link" data-section="suggestions">💡 Suggestions</a></li>
+            <li><a href="#home" class="menu-link" data-section="home"><i class="fas fa-home"></i> Home</a></li>
+            <li><a href="#activation" class="menu-link" data-section="activation"><i class="fas fa-shield-alt"></i> Activation</a></li>
+            <li><a href="#statistics" class="menu-link" data-section="statistics"><i class="fas fa-chart-bar"></i> Statistics</a></li>
+            <li><a href="#commands" class="menu-link" data-section="commands"><i class="fas fa-zap"></i> Commands</a></li>
+            <li><a href="#help" class="menu-link" data-section="help"><i class="fas fa-question-circle"></i> Help</a></li>
+            <li><a href="#suggestions" class="menu-link" data-section="suggestions"><i class="fas fa-lightbulb"></i> Suggestions</a></li>
         </ul>
     </nav>
 
@@ -88,7 +93,7 @@
                 <div class="languages-grid">
                     <span class="lang-badge">🇨🇳 Chinese</span>
                     <span class="lang-badge">🇺🇸 English</span>
-                    <span class="lang-badge">🇸🇾Arabic</span>
+                    <span class="lang-badge">🟩 Arabic</span>
                     <span class="lang-badge">🇪🇸 Spanish</span>
                     <span class="lang-badge">🇷🇺 Russian</span>
                     <span class="lang-badge">🇹🇷 Turkish</span>
@@ -190,7 +195,7 @@
         </section>
 
         <footer>
-            <p>ProEmoji Bot © 2024 | Built with Discord.js & Node.js</p>
+            <p>ProEmoji Bot © 2024</p>
         </footer>
     </main>
 

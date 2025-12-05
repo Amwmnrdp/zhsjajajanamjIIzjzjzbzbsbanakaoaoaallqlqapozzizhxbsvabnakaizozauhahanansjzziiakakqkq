@@ -425,6 +425,21 @@ app.get('/api/stats', (req, res) => {
     });
 });
 
+// User profile endpoint
+app.get('/api/user-profile', async (req, res) => {
+    try {
+        if (!DISCORD_CLIENT_ID) {
+            return res.status(400).json({ error: 'Discord not configured' });
+        }
+        res.json({
+            username: 'ProEmoji User',
+            avatar: 'https://cdn.discordapp.com/embed/avatars/0.png'
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Discord OAuth2 - Redirect to Discord authorization
 app.get('/auth/discord', (req, res) => {
     if (!DISCORD_CLIENT_ID) {

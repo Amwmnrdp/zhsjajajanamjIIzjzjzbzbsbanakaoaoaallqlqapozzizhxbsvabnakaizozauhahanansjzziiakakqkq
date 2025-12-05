@@ -350,11 +350,31 @@ document.querySelectorAll('.feature-card, .command, .lang-badge, .stat-card').fo
     observer.observe(el);
 });
 
+// Load User Profile
+async function loadUserProfile() {
+    try {
+        const response = await fetch('/api/user-profile');
+        if (!response.ok) return;
+        
+        const user = await response.json();
+        const userAvatar = document.getElementById('userAvatar');
+        const userName = document.getElementById('userName');
+        
+        if (userAvatar && userName && user.avatar && user.username) {
+            userAvatar.src = user.avatar;
+            userName.textContent = user.username;
+        }
+    } catch (error) {
+        console.log('User profile not available');
+    }
+}
+
 // Initialize
 window.addEventListener('load', () => {
     loadHelp();
     loadSuggestions();
     loadServerCount();
+    loadUserProfile();
     
     // Refresh stats every 30 seconds
     setInterval(loadServerCount, 30000);
