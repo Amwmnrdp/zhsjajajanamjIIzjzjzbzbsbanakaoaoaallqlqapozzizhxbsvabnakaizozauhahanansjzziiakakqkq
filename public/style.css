@@ -38,6 +38,9 @@ body {
     align-items: center;
     justify-content: center;
     transition: all 0.3s ease;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: manipulation;
 }
 
 .hamburger-btn:hover {
@@ -79,6 +82,10 @@ body {
     z-index: 999;
     transition: left 0.3s ease;
     overflow-y: auto;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: pan-y;
+    -webkit-touch-callout: none;
 }
 
 /* User Profile Section */
