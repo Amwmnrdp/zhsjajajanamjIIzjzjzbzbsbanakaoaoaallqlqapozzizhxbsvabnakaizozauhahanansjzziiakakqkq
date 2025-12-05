@@ -48,8 +48,15 @@
         <h1>Verification Successful!</h1>
         <p>Your Discord account has been verified. You can now use all ProEmoji Bot commands.</p>
         <p>Your verification is valid for <span class="highlight">5 hours</span>. After that, you'll need to verify again.</p>
-        <a href="/" class="btn">Back to Dashboard</a>
+        <a href="/#activation" class="btn">Back to Dashboard</a>
         <p class="note">You can close this window and return to Discord.</p>
     </div>
+
+    <script>
+        localStorage.setItem('proemoji_verified_time', Date.now().toString());
+        setTimeout(() => {
+            window.location.href = '/#activation';
+        }, 2000);
+    </script>
 </body>
 </html>

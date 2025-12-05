@@ -48,7 +48,20 @@ ${await t('You can convert a sticker to an emoji using this slash command', lang
         .setDescription(helpContent)
         .setColor('#0099ff');
 
-    await interaction.reply({ embeds: [embed] });
+    try {
+        await interaction.user.send({ embeds: [embed] });
+        const replyEmbed = new EmbedBuilder()
+            .setTitle('✅ Help Sent')
+            .setDescription('Check your private messages for the help menu!')
+            .setColor('#10b981');
+        await interaction.reply({ embeds: [replyEmbed], ephemeral: true });
+    } catch (error) {
+        const errorEmbed = new EmbedBuilder()
+            .setTitle('❌ Could not send DM')
+            .setDescription('Please enable DMs from server members and try again.')
+            .setColor('#FF6B6B');
+        await interaction.reply({ embeds: [errorEmbed], ephemeral: true });
+    }
 }
 
 module.exports = { execute };

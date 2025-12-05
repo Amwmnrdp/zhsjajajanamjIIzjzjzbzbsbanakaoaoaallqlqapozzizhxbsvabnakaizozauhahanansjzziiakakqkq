@@ -215,12 +215,90 @@ async function loadServerCount() {
     }
 }
 
+// Verification Timer Management
+const VERIFICATION_DURATION = 5 * 60 * 60 * 1000; // 5 hours in milliseconds
+
+function formatTime(ms) {
+    const totalSeconds = Math.floor(ms / 1000);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    return `${hours}h ${minutes}m ${seconds}s`;
+}
+
+function updateVerificationStatus() {
+    const activateBtn = document.getElementById('activateBtn');
+    if (!activateBtn) return;
+
+    const verifiedTime = localStorage.getItem('proemoji_verified_time');
+    if (!verifiedTime) {
+        activateBtn.disabled = false;
+        activateBtn.style.opacity = '1';
+        activateBtn.style.cursor = 'pointer';
+        const timerDiv = document.getElementById('verificationTimer');
+        if (timerDiv) timerDiv.remove();
+        return;
+    }
+
+    const verifiedAt = parseInt(verifiedTime);
+    const expiresAt = verifiedAt + VERIFICATION_DURATION;
+    const now = Date.now();
+
+    if (now > expiresAt) {
+        localStorage.removeItem('proemoji_verified_time');
+        updateVerificationStatus();
+        return;
+    }
+
+    activateBtn.disabled = true;
+    activateBtn.style.opacity = '0.6';
+    activateBtn.style.cursor = 'not-allowed';
+
+    let timerDiv = document.getElementById('verificationTimer');
+    if (!timerDiv) {
+        timerDiv = document.createElement('div');
+        timerDiv.id = 'verificationTimer';
+        timerDiv.style.cssText = `
+            text-align: center;
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(16, 185, 129, 0.1);
+            border: 2px solid rgba(16, 185, 129, 0.3);
+            border-radius: 10px;
+            color: #10b981;
+            font-weight: 600;
+            font-size: 1.1em;
+        `;
+        activateBtn.parentElement.appendChild(timerDiv);
+    }
+
+    const remainingTime = expiresAt - now;
+    timerDiv.textContent = `✅ Verified! Expires in: ${formatTime(remainingTime)}`;
+
+    const interval = setInterval(() => {
+        const now = Date.now();
+        const remainingTime = expiresAt - now;
+
+        if (remainingTime <= 0) {
+            clearInterval(interval);
+            localStorage.removeItem('proemoji_verified_time');
+            updateVerificationStatus();
+            return;
+        }
+
+        timerDiv.textContent = `✅ Verified! Expires in: ${formatTime(remainingTime)}`;
+    }, 1000);
+}
+
 // Activate Account Button
 const activateBtn = document.getElementById('activateBtn');
 if (activateBtn) {
     activateBtn.addEventListener('click', () => {
         window.location.href = '/auth/discord';
     });
+    
+    // Check verification status on page load
+    updateVerificationStatus();
 }
 
 // Show Notification
