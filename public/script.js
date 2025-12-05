@@ -415,4 +415,4 @@ window.addEventListener('load', () => {
     setInterval(loadServerCount, 30000);
 });
 
-console.log('✅ ProEmoji Bot Dashboard loaded!');
+console.log('✅ ProEmoji Dashboard loaded!');
