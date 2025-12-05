@@ -461,9 +461,15 @@ app.get('/api/user-profile', async (req, res) => {
     try {
         if (currentVerifiedUser) {
             const isUserAdmin = await db.isAdmin(currentVerifiedUser.discord_id);
+            const verifiedUser = await db.getVerifiedUser(currentVerifiedUser.discord_id);
+            const verifiedAt = verifiedUser ? new Date(verifiedUser.verified_at).getTime() : null;
+            const expiresAt = verifiedAt ? verifiedAt + (5 * 60 * 60 * 1000) : null;
+            
             res.json({
                 ...currentVerifiedUser,
-                is_admin: isUserAdmin
+                is_admin: isUserAdmin,
+                verified_at: verifiedAt,
+                expires_at: expiresAt
             });
         } else {
             res.json({

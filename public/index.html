@@ -30,7 +30,7 @@
             <li><a href="#commands" class="menu-link" data-section="commands"><i class="fas fa-terminal"></i> Commands</a></li>
             <li><a href="#suggestions" class="menu-link" data-section="suggestions"><i class="fas fa-lightbulb"></i> Suggestions</a></li>
             <li><a href="#reports" class="menu-link" data-section="reports"><i class="fas fa-bug"></i> Issue Reports</a></li>
-            <li><a href="/admin.html" class="menu-link"><i class="fas fa-crown"></i> Admin Panel</a></li>
+            <li id="adminPanelLink" style="display: none;"><a href="/admin.html" class="menu-link"><i class="fas fa-crown"></i> Admin Panel</a></li>
         </ul>
     </nav>
 
@@ -57,32 +57,32 @@
                 <h2><i class="fas fa-rocket" style="margin-right: 10px;"></i>Features</h2>
                 <div class="features-grid">
                     <div class="feature-card">
-                        <div class="feature-icon">😊</div>
+                        <div class="feature-icon"><i class="fas fa-smile" style="font-size: 2.5em; color: #667eea;"></i></div>
                         <h3>Emoji Management</h3>
                         <p>Add, delete, rename, and search emojis with ease</p>
                     </div>
                     <div class="feature-card">
-                        <div class="feature-icon">🎫</div>
+                        <div class="feature-icon"><i class="fas fa-sticky-note" style="font-size: 2.5em; color: #764ba2;"></i></div>
                         <h3>Sticker Management</h3>
                         <p>Create, rename, and delete stickers effortlessly</p>
                     </div>
                     <div class="feature-card">
-                        <div class="feature-icon">🔄</div>
+                        <div class="feature-icon"><i class="fas fa-sync-alt" style="font-size: 2.5em; color: #f59e0b;"></i></div>
                         <h3>Conversions</h3>
                         <p>Convert emojis to stickers and vice versa</p>
                     </div>
                     <div class="feature-card">
-                        <div class="feature-icon">🖼️</div>
+                        <div class="feature-icon"><i class="fas fa-image" style="font-size: 2.5em; color: #10b981;"></i></div>
                         <h3>Image Upload</h3>
                         <p>Transform images into emojis and stickers</p>
                     </div>
                     <div class="feature-card">
-                        <div class="feature-icon">🌍</div>
+                        <div class="feature-icon"><i class="fas fa-globe" style="font-size: 2.5em; color: #3b82f6;"></i></div>
                         <h3>12 Languages</h3>
                         <p>Support for Chinese, English, Arabic, Spanish, and more</p>
                     </div>
                     <div class="feature-card">
-                        <div class="feature-icon">🔐</div>
+                        <div class="feature-icon"><i class="fas fa-shield-alt" style="font-size: 2.5em; color: #ef4444;"></i></div>
                         <h3>Server Control</h3>
                         <p>Manage permissions and access by server</p>
                     </div>
@@ -112,8 +112,8 @@
         <section id="activation" class="content-section">
             <h2><i class="fas fa-shield-alt" style="margin-right: 10px;"></i>Activation</h2>
             <div class="activation-hero">
-                <div class="activation-main-card">
-                    <div class="activation-icon">🔐</div>
+                <div class="activation-main-card" id="activationCard">
+                    <div class="activation-icon"><i class="fas fa-lock" style="font-size: 3em; color: #667eea;"></i></div>
                     <h3>Account Verification Required</h3>
                     <p>To use ProEmoji commands, you must verify your Discord account. Verification is required every 5 hours for security.</p>
                     <button class="btn-activate" id="activateBtn">
@@ -123,6 +123,18 @@
                         Activate Your Account
                     </button>
                     <p class="verification-note">You will be redirected to Discord to authorize your account</p>
+                </div>
+                <div class="activation-main-card verified-card" id="verifiedCard" style="display: none;">
+                    <div class="activation-icon"><i class="fas fa-check-circle" style="font-size: 3em; color: #10b981;"></i></div>
+                    <h3>Account Verified!</h3>
+                    <p>Your Discord account is verified. You can now use all ProEmoji commands.</p>
+                    <div class="timer-container">
+                        <div class="timer-label">Time until re-verification:</div>
+                        <div class="timer-display" id="verificationTimer">
+                            <span id="timerHours">00</span>:<span id="timerMinutes">00</span>:<span id="timerSeconds">00</span>
+                        </div>
+                    </div>
+                    <p class="verification-note">You will need to verify again when the timer expires</p>
                 </div>
             </div>
         </section>
