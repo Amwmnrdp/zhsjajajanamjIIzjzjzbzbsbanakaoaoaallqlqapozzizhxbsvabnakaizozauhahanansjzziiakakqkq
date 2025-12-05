@@ -111,6 +111,12 @@ function cleanupExpiredUsers() {
     }
 }
 
+function resetAllVerifications() {
+    console.log('🔄 Resetting all user verifications on bot startup...');
+    saveVerifiedUsers({});
+    console.log('✅ All verifications have been reset');
+}
+
 setInterval(cleanupExpiredUsers, 60 * 60 * 1000);
 
 module.exports = {
@@ -120,5 +126,6 @@ module.exports = {
     getVerifiedUsersCount,
     getTotalVerificationsCount,
     cleanupExpiredUsers,
+    resetAllVerifications,
     VERIFICATION_DURATION
 };

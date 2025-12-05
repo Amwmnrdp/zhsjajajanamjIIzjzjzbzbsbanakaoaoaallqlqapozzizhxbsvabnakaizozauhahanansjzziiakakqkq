@@ -11,7 +11,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 const { getHelp, addHelp, getSuggestions, addSuggestion } = require('./src/utils/submissions');
 
 // Import verified users utility
-const { verifyUser, isUserVerified, getVerificationStatus, getVerifiedUsersCount, VERIFICATION_DURATION } = require('./src/utils/verifiedUsers');
+const { verifyUser, isUserVerified, getVerificationStatus, getVerifiedUsersCount, resetAllVerifications, VERIFICATION_DURATION } = require('./src/utils/verifiedUsers');
 
 // Discord OAuth2 Configuration
 const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID;
@@ -70,6 +70,9 @@ const convertedImagesToStickers = new Map();
 const convertedStickersToEmojis = new Map();
 
 loadServerLanguages();
+
+// Reset all verifications on bot startup/restart
+resetAllVerifications();
 
 client.once('ready', async () => {
     console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
@@ -157,8 +160,8 @@ client.on('interactionCreate', async interaction => {
     if (!interaction.isCommand()) return;
     const langCode = getServerLanguage(interaction.guild.id);
 
-    // Check verification for all commands except ping (allow ping without verification)
-    if (interaction.commandName !== 'ping') {
+    // Check verification for all commands except ping and help (allow these without verification)
+    if (interaction.commandName !== 'ping' && interaction.commandName !== 'help') {
         const isVerified = await checkVerification(interaction, langCode);
         if (!isVerified) return;
     }
