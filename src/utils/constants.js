@@ -35,10 +35,10 @@ const COMMAND_DEFINITIONS = [
     },
     {
         name: 'permission',
-        description: 'Set permissions for emoji suggestions'
+        description: 'Set permissions for emoji suggestions (Owner only)'
     },
     {
-        name: 'suggestemojis',
+        name: 'suggest_emojis',
         description: 'Get 5 emoji suggestions'
     },
     {
@@ -54,7 +54,7 @@ const COMMAND_DEFINITIONS = [
         ]
     },
     {
-        name: 'addemoji',
+        name: 'add_emoji',
         description: 'Add an emoji to server',
         options: [
             {
@@ -131,7 +131,7 @@ const COMMAND_DEFINITIONS = [
     },
     {
         name: 'language',
-        description: 'Change bot language'
+        description: 'Change bot language (Owner only)'
     },
     {
         name: 'delete_emoji',
@@ -201,8 +201,19 @@ const COMMAND_DEFINITIONS = [
     }
 ];
 
+const OWNER_ONLY_COMMANDS = ['language', 'permission'];
+const PUBLIC_COMMANDS = ['ping', 'help'];
+const EMOJI_PERMISSION_COMMANDS = [
+    'add_emoji', 'delete_emoji', 'rename_emoji', 'image_to_emoji', 
+    'emoji_to_sticker', 'sticker_to_emoji', 'emoji_search', 'suggest_emojis',
+    'list_emojis', 'delete_sticker', 'rename_sticker', 'image_to_sticker', 'list_stickers'
+];
+
 module.exports = {
     SUPPORTED_LANGUAGES,
     LEGACY_LANGUAGE_MAP,
-    COMMAND_DEFINITIONS
+    COMMAND_DEFINITIONS,
+    OWNER_ONLY_COMMANDS,
+    PUBLIC_COMMANDS,
+    EMOJI_PERMISSION_COMMANDS
 };

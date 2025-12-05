@@ -3,30 +3,13 @@ const path = require('path');
 const app = express();
 const { Client, GatewayIntentBits, EmbedBuilder, PermissionsBitField } = require('discord.js');
 
-// Middleware
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Import submissions utility
-const { getHelp, addHelp, getSuggestions, addSuggestion } = require('./src/utils/submissions');
+const db = require('./src/utils/database');
+const { SUPPORTED_LANGUAGES, COMMAND_DEFINITIONS, OWNER_ONLY_COMMANDS, PUBLIC_COMMANDS, EMOJI_PERMISSION_COMMANDS } = require('./src/utils/constants');
+const { t, preWarmCache } = require('./src/utils/languages');
 
-// Import verified users utility
-const { verifyUser, isUserVerified, getVerificationStatus, getVerifiedUsersCount, resetAllVerifications, VERIFICATION_DURATION } = require('./src/utils/verifiedUsers');
-
-// Discord OAuth2 Configuration
-const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID;
-const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET;
-const REDIRECT_URI = process.env.REPLIT_DEV_DOMAIN 
-    ? `https://${process.env.REPLIT_DEV_DOMAIN}/auth/discord/callback`
-    : 'http://localhost:3000/auth/discord/callback';
-
-// Import utilities
-const { SUPPORTED_LANGUAGES, COMMAND_DEFINITIONS } = require('./src/utils/constants');
-const { readServersFile, writeServersFile } = require('./src/utils/storage');
-const { loadServerLanguages, saveServerLanguage, getServerLanguage, t, preWarmCache } = require('./src/utils/languages');
-const { allowedServers, setServerPermission } = require('./src/utils/permissions');
-
-// Import emoji commands
 const addemojiCmd = require('./src/commands/emoji/addemoji');
 const listemoji = require('./src/commands/emoji/listemoji');
 const deletemoji = require('./src/commands/emoji/deletemoji');
@@ -36,18 +19,26 @@ const imagetoemoji = require('./src/commands/emoji/imagetoemoji');
 const emojiTosticker = require('./src/commands/emoji/emojiTosticker');
 const suggestemojis = require('./src/commands/emoji/suggestemojis');
 
-// Import sticker commands
 const deletesticker = require('./src/commands/sticker/deletesticker');
 const renamesticker = require('./src/commands/sticker/renamesticker');
 const stickertoemi = require('./src/commands/sticker/stickertoemi');
 const imagetosticker = require('./src/commands/sticker/imagetosticker');
 const liststicker = require('./src/commands/sticker/liststicker');
 
-// Import storage commands
 const ping = require('./src/commands/storage/ping');
 const permission = require('./src/commands/storage/permission');
 const language = require('./src/commands/storage/language');
 const help = require('./src/commands/storage/help');
+
+const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID;
+const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET;
+const REDIRECT_URI = process.env.REPLIT_DEV_DOMAIN 
+    ? `https://${process.env.REPLIT_DEV_DOMAIN}/auth/discord/callback`
+    : 'http://localhost:3000/auth/discord/callback';
+
+const WEBSITE_URL = process.env.REPLIT_DEV_DOMAIN 
+    ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+    : 'http://localhost:3000';
 
 const client = new Client({
     intents: [
@@ -69,10 +60,18 @@ const convertedEmojisToStickers = new Map();
 const convertedImagesToStickers = new Map();
 const convertedStickersToEmojis = new Map();
 
-loadServerLanguages();
+let currentVerifiedUser = null;
 
-// Reset all verifications on bot startup/restart
-resetAllVerifications();
+async function initializeBot() {
+    try {
+        await db.initDatabase();
+        console.log('✅ Database initialized');
+    } catch (error) {
+        console.error('❌ Database initialization failed:', error.message);
+    }
+}
+
+initializeBot();
 
 client.once('ready', async () => {
     console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
@@ -80,7 +79,6 @@ client.once('ready', async () => {
     console.log(`✅ Status: Online and Ready!`);
     console.log(`📊 Servers: ${client.guilds.cache.size}`);
     console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
-    
 
     client.user.setPresence({
         status: 'idle',
@@ -100,35 +98,29 @@ client.once('ready', async () => {
     }
 });
 
-client.on('guildCreate', guild => {
-    setServerPermission(guild.id, true);
-    saveServerLanguage(guild.id, 'en');
-    const servers = readServersFile();
-    if (!servers.includes(guild.name)) {
-        servers.push(guild.name);
-        writeServersFile(servers);
+client.on('guildCreate', async guild => {
+    try {
+        await db.addServer(guild.id, guild.name);
         console.log(`✅ Joined: ${guild.name}`);
+    } catch (error) {
+        console.error('Error adding server:', error.message);
     }
 });
 
-client.on('guildDelete', guild => {
-    allowedServers.delete(guild.id);
-    const servers = readServersFile();
-    const updatedServers = servers.filter(name => name !== guild.name);
-    writeServersFile(updatedServers);
-    console.log(`❌ Left: ${guild.name}`);
+client.on('guildDelete', async guild => {
+    try {
+        await db.removeServer(guild.id);
+        console.log(`❌ Left: ${guild.name}`);
+    } catch (error) {
+        console.error('Error removing server:', error.message);
+    }
 });
 
-// Website URL for verification
-const WEBSITE_URL = process.env.REPLIT_DEV_DOMAIN 
-    ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-    : 'http://localhost:3000';
-
-// Helper function to check verification and send error message
 async function checkVerification(interaction, langCode) {
     const userId = interaction.user.id;
+    const isVerified = await db.isUserVerifiedDb(userId);
     
-    if (!isUserVerified(userId)) {
+    if (!isVerified) {
         const embed = new EmbedBuilder()
             .setTitle('🔐 ' + await t('Verification Required', langCode))
             .setDescription(await t('You must verify your Discord account before using commands.', langCode) + 
@@ -143,11 +135,48 @@ async function checkVerification(interaction, langCode) {
     return true;
 }
 
+async function checkPermissions(interaction, langCode) {
+    const commandName = interaction.commandName;
+    
+    if (PUBLIC_COMMANDS.includes(commandName)) {
+        return true;
+    }
+    
+    if (OWNER_ONLY_COMMANDS.includes(commandName)) {
+        if (!interaction.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
+            const embed = new EmbedBuilder()
+                .setTitle('🚫 ' + await t('Permission Denied', langCode))
+                .setDescription(await t('Only the server owner or administrators can use this command.', langCode))
+                .setColor('#FF0000');
+            await interaction.reply({ embeds: [embed], ephemeral: true });
+            return false;
+        }
+        return true;
+    }
+    
+    if (EMOJI_PERMISSION_COMMANDS.includes(commandName)) {
+        const hasManageEmoji = interaction.member.permissions.has(PermissionsBitField.Flags.ManageGuildExpressions) ||
+                               interaction.member.permissions.has(PermissionsBitField.Flags.ManageEmojisAndStickers);
+        
+        if (!hasManageEmoji) {
+            const embed = new EmbedBuilder()
+                .setTitle('🚫 ' + await t('Permission Denied', langCode))
+                .setDescription(await t('You need the "Manage Emojis and Stickers" permission to use this command.', langCode))
+                .setColor('#FF0000');
+            await interaction.reply({ embeds: [embed], ephemeral: true });
+            return false;
+        }
+        return true;
+    }
+    
+    return true;
+}
+
 client.on('interactionCreate', async interaction => {
     if (interaction.isStringSelectMenu() && interaction.customId === 'language_select') {
         const langCode = interaction.values[0];
         const langInfo = SUPPORTED_LANGUAGES[langCode];
-        saveServerLanguage(interaction.guild.id, langCode);
+        await db.setServerLanguage(interaction.guild.id, langCode);
         
         const embed = new EmbedBuilder()
             .setTitle(await t('Language Updated!', langCode))
@@ -158,21 +187,24 @@ client.on('interactionCreate', async interaction => {
     }
     
     if (!interaction.isCommand()) return;
-    const langCode = getServerLanguage(interaction.guild.id);
+    
+    const langCode = await db.getServerLanguage(interaction.guild.id);
 
-    // Check verification for all commands except ping and help (allow these without verification)
-    if (interaction.commandName !== 'ping' && interaction.commandName !== 'help') {
+    if (!PUBLIC_COMMANDS.includes(interaction.commandName)) {
         const isVerified = await checkVerification(interaction, langCode);
         if (!isVerified) return;
     }
+
+    const hasPermission = await checkPermissions(interaction, langCode);
+    if (!hasPermission) return;
 
     try {
         if (interaction.commandName === 'ping') await ping.execute(interaction);
         else if (interaction.commandName === 'help') await help.execute(interaction, langCode);
         else if (interaction.commandName === 'permission') await permission.execute(interaction, langCode);
         else if (interaction.commandName === 'emoji_search') await emojisearch.execute(interaction, langCode, client);
-        else if (interaction.commandName === 'suggestemojis') await suggestemojis.execute(interaction, langCode, client);
-        else if (interaction.commandName === 'addemoji') await addemojiCmd.execute(interaction, langCode);
+        else if (interaction.commandName === 'suggest_emojis') await suggestemojis.execute(interaction, langCode, client);
+        else if (interaction.commandName === 'add_emoji') await addemojiCmd.execute(interaction, langCode);
         else if (interaction.commandName === 'image_to_emoji') await imagetoemoji.execute(interaction, langCode, usedUrls);
         else if (interaction.commandName === 'emoji_to_sticker') await emojiTosticker.execute(interaction, langCode, convertedEmojisToStickers);
         else if (interaction.commandName === 'list_emojis') await listemoji.execute(interaction, langCode);
@@ -226,13 +258,13 @@ client.on('interactionCreate', async interaction => {
 client.on('messageCreate', async message => {
     if (message.author.bot) return;
     if (!message.guild) return;
-    const langCode = getServerLanguage(message.guild.id);
+    const langCode = await db.getServerLanguage(message.guild.id);
 
     try {
-        // Check verification for message commands
         if (message.content.startsWith(prefix)) {
             const userId = message.author.id;
-            if (!isUserVerified(userId)) {
+            const isVerified = await db.isUserVerifiedDb(userId);
+            if (!isVerified) {
                 const embed = new EmbedBuilder()
                     .setTitle('🔐 ' + await t('Verification Required', langCode))
                     .setDescription(await t('You must verify your Discord account before using commands.', langCode) + 
@@ -405,48 +437,48 @@ client.on('messageCreate', async message => {
     }
 });
 
-// Serve dashboard
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Admin panel
 app.get('/admin', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'admin.html'));
 });
 
-// API endpoints
 app.get('/api/health', (req, res) => {
     res.json({ status: 'online', bot: 'ProEmoji' });
 });
 
-// Stats endpoint
-app.get('/api/stats', (req, res) => {
+app.get('/api/stats', async (req, res) => {
+    const verifiedCount = await db.getVerifiedUsersCountDb();
     res.json({ 
         servers: client.guilds.cache.size,
-        verifiedUsers: getVerifiedUsersCount()
+        verifiedUsers: verifiedCount
     });
 });
 
-// User profile endpoint
 app.get('/api/user-profile', async (req, res) => {
     try {
-        if (!DISCORD_CLIENT_ID) {
-            return res.status(400).json({ error: 'Discord not configured' });
+        if (currentVerifiedUser) {
+            const isUserAdmin = await db.isAdmin(currentVerifiedUser.discord_id);
+            res.json({
+                ...currentVerifiedUser,
+                is_admin: isUserAdmin
+            });
+        } else {
+            res.json({
+                username: 'Guest',
+                avatar: 'https://cdn.discordapp.com/embed/avatars/0.png'
+            });
         }
-        res.json({
-            username: 'ProEmoji User',
-            avatar: 'https://cdn.discordapp.com/embed/avatars/0.png'
-        });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
 
-// Discord OAuth2 - Redirect to Discord authorization
 app.get('/auth/discord', (req, res) => {
     if (!DISCORD_CLIENT_ID) {
-        return res.status(500).send('Discord OAuth2 not configured. Please set DISCORD_CLIENT_ID.');
+        return res.status(500).send('Discord OAuth2 not configured.');
     }
     
     const params = new URLSearchParams({
@@ -459,20 +491,17 @@ app.get('/auth/discord', (req, res) => {
     res.redirect(`https://discord.com/api/oauth2/authorize?${params.toString()}`);
 });
 
-// Discord OAuth2 Callback
 app.get('/auth/discord/callback', async (req, res) => {
     const code = req.query.code;
     
     if (!code) {
-        return res.redirect('/verification-failed.html');
+        return res.redirect('/#activation?error=no_code');
     }
     
     try {
         const tokenResponse = await fetch('https://discord.com/api/oauth2/token', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded'
-            },
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body: new URLSearchParams({
                 client_id: DISCORD_CLIENT_ID,
                 client_secret: DISCORD_CLIENT_SECRET,
@@ -485,93 +514,316 @@ app.get('/auth/discord/callback', async (req, res) => {
         const tokenData = await tokenResponse.json();
         
         if (!tokenData.access_token) {
-            console.error('OAuth2 token error:', tokenData);
-            return res.redirect('/verification-failed.html');
+            return res.redirect('/#activation?error=token_failed');
         }
         
         const userResponse = await fetch('https://discord.com/api/users/@me', {
-            headers: {
-                Authorization: `Bearer ${tokenData.access_token}`
-            }
+            headers: { Authorization: `Bearer ${tokenData.access_token}` }
         });
         
         const userData = await userResponse.json();
         
         if (!userData.id) {
-            console.error('User data error:', userData);
-            return res.redirect('/verification-failed.html');
+            return res.redirect('/#activation?error=user_failed');
         }
         
-        verifyUser(userData.id, userData.username);
-        console.log(`User verified: ${userData.username} (${userData.id})`);
-        
         const avatarUrl = userData.avatar 
-            ? `https://cdn.discordapp.com/avatars/${userData.id}/${userData.avatar}.png?size=128`
-            : `https://cdn.discordapp.com/embed/avatars/${parseInt(userData.discriminator || '0') % 5}.png`;
+            ? `https://cdn.discordapp.com/avatars/${userData.id}/${userData.avatar}.png`
+            : 'https://cdn.discordapp.com/embed/avatars/0.png';
         
-        const userInfo = encodeURIComponent(JSON.stringify({
+        await db.verifyUserDb(userData.id, userData.username, avatarUrl);
+        
+        currentVerifiedUser = {
+            discord_id: userData.id,
             username: userData.username,
-            avatar: avatarUrl,
-            id: userData.id
-        }));
+            avatar: avatarUrl
+        };
         
-        res.redirect(`/verification-success.html?user=${userInfo}`);
+        console.log(`✅ User verified: ${userData.username} (${userData.id})`);
+        
+        res.redirect('/#home');
     } catch (error) {
-        console.error('OAuth2 callback error:', error);
-        res.redirect('/verification-failed.html');
+        console.error('OAuth2 error:', error);
+        res.redirect('/#activation?error=oauth_failed');
     }
 });
 
-// Help endpoints
-app.get('/api/help', (req, res) => {
-    res.json(getHelp());
+app.get('/api/suggestions', async (req, res) => {
+    try {
+        const suggestions = await db.getSuggestions();
+        res.json(suggestions);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
 });
 
-app.post('/api/help', (req, res) => {
-    const { title, content, timestamp } = req.body;
-    if (!title || !content) {
-        return res.status(400).json({ error: 'Missing fields' });
+app.post('/api/suggestions', async (req, res) => {
+    try {
+        if (!currentVerifiedUser) {
+            return res.status(401).json({ error: 'Not verified' });
+        }
+        
+        const { title, description } = req.body;
+        const suggestion = await db.createSuggestion(
+            currentVerifiedUser.discord_id,
+            currentVerifiedUser.username,
+            currentVerifiedUser.avatar,
+            title,
+            description
+        );
+        res.json(suggestion);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
     }
-    const success = addHelp(title, content, timestamp || new Date().toISOString());
-    if (success) {
+});
+
+app.delete('/api/suggestions/:id', async (req, res) => {
+    try {
+        if (!currentVerifiedUser) {
+            return res.status(401).json({ error: 'Not verified' });
+        }
+        
+        const suggestion = await db.getSuggestionById(req.params.id);
+        const isUserAdmin = await db.isAdmin(currentVerifiedUser.discord_id);
+        
+        if (suggestion.discord_id !== currentVerifiedUser.discord_id && !isUserAdmin) {
+            return res.status(403).json({ error: 'Not authorized' });
+        }
+        
+        await db.deleteSuggestion(req.params.id);
         res.json({ success: true });
-    } else {
-        res.status(500).json({ error: 'Failed to add help' });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
     }
 });
 
-// Suggestions endpoints
-app.get('/api/suggestions', (req, res) => {
-    res.json(getSuggestions());
-});
-
-app.post('/api/suggestions', (req, res) => {
-    const { title, content, timestamp } = req.body;
-    if (!title || !content) {
-        return res.status(400).json({ error: 'Missing fields' });
-    }
-    const success = addSuggestion(title, content, timestamp || new Date().toISOString());
-    if (success) {
+app.post('/api/suggestions/:id/like', async (req, res) => {
+    try {
+        if (!currentVerifiedUser) {
+            return res.status(401).json({ error: 'Not verified' });
+        }
+        
+        const { is_like } = req.body;
+        await db.toggleLike(currentVerifiedUser.discord_id, 'suggestion', req.params.id, is_like);
         res.json({ success: true });
-    } else {
-        res.status(500).json({ error: 'Failed to add suggestion' });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
     }
 });
 
-const PORT = 5000;
+app.get('/api/suggestions/:id/comments', async (req, res) => {
+    try {
+        const comments = await db.getComments('suggestion', req.params.id);
+        res.json(comments);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.post('/api/suggestions/:id/comments', async (req, res) => {
+    try {
+        if (!currentVerifiedUser) {
+            return res.status(401).json({ error: 'Not verified' });
+        }
+        
+        const { content } = req.body;
+        const comment = await db.addComment(
+            currentVerifiedUser.discord_id,
+            currentVerifiedUser.username,
+            currentVerifiedUser.avatar,
+            'suggestion',
+            req.params.id,
+            content
+        );
+        res.json(comment);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.get('/api/reports', async (req, res) => {
+    try {
+        const reports = await db.getReports();
+        res.json(reports);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.post('/api/reports', async (req, res) => {
+    try {
+        if (!currentVerifiedUser) {
+            return res.status(401).json({ error: 'Not verified' });
+        }
+        
+        const { title, description, image_url } = req.body;
+        const report = await db.createReport(
+            currentVerifiedUser.discord_id,
+            currentVerifiedUser.username,
+            currentVerifiedUser.avatar,
+            title,
+            description,
+            image_url
+        );
+        res.json(report);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.delete('/api/reports/:id', async (req, res) => {
+    try {
+        if (!currentVerifiedUser) {
+            return res.status(401).json({ error: 'Not verified' });
+        }
+        
+        const report = await db.getReportById(req.params.id);
+        const isUserAdmin = await db.isAdmin(currentVerifiedUser.discord_id);
+        
+        if (report.discord_id !== currentVerifiedUser.discord_id && !isUserAdmin) {
+            return res.status(403).json({ error: 'Not authorized' });
+        }
+        
+        await db.deleteReport(req.params.id);
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.post('/api/reports/:id/like', async (req, res) => {
+    try {
+        if (!currentVerifiedUser) {
+            return res.status(401).json({ error: 'Not verified' });
+        }
+        
+        const { is_like } = req.body;
+        await db.toggleLike(currentVerifiedUser.discord_id, 'report', req.params.id, is_like);
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.get('/api/reports/:id/comments', async (req, res) => {
+    try {
+        const comments = await db.getComments('report', req.params.id);
+        res.json(comments);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.post('/api/reports/:id/comments', async (req, res) => {
+    try {
+        if (!currentVerifiedUser) {
+            return res.status(401).json({ error: 'Not verified' });
+        }
+        
+        const { content } = req.body;
+        const comment = await db.addComment(
+            currentVerifiedUser.discord_id,
+            currentVerifiedUser.username,
+            currentVerifiedUser.avatar,
+            'report',
+            req.params.id,
+            content
+        );
+        res.json(comment);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.delete('/api/comments/:id', async (req, res) => {
+    try {
+        if (!currentVerifiedUser) {
+            return res.status(401).json({ error: 'Not verified' });
+        }
+        
+        const isUserAdmin = await db.isAdmin(currentVerifiedUser.discord_id);
+        await db.deleteComment(req.params.id, currentVerifiedUser.discord_id, isUserAdmin);
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.get('/api/admins', async (req, res) => {
+    try {
+        const admins = await db.getAllAdmins();
+        res.json(admins);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.post('/api/admins', async (req, res) => {
+    try {
+        if (!currentVerifiedUser) {
+            return res.status(401).json({ error: 'Not verified' });
+        }
+        
+        const isUserOwner = await db.isOwner(currentVerifiedUser.discord_id);
+        if (!isUserOwner) {
+            return res.status(403).json({ error: 'Only the owner can add admins' });
+        }
+        
+        const { discord_id, username, avatar } = req.body;
+        await db.addAdmin(discord_id, username, avatar, false);
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.delete('/api/admins/:discord_id', async (req, res) => {
+    try {
+        if (!currentVerifiedUser) {
+            return res.status(401).json({ error: 'Not verified' });
+        }
+        
+        const isUserOwner = await db.isOwner(currentVerifiedUser.discord_id);
+        if (!isUserOwner) {
+            return res.status(403).json({ error: 'Only the owner can remove admins' });
+        }
+        
+        await db.removeAdmin(req.params.discord_id);
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.post('/api/set-owner', async (req, res) => {
+    try {
+        if (!currentVerifiedUser) {
+            return res.status(401).json({ error: 'Not verified' });
+        }
+        
+        const admins = await db.getAllAdmins();
+        const hasOwner = admins.some(a => a.is_owner);
+        
+        if (hasOwner) {
+            return res.status(400).json({ error: 'Owner already exists' });
+        }
+        
+        await db.addAdmin(
+            currentVerifiedUser.discord_id,
+            currentVerifiedUser.username,
+            currentVerifiedUser.avatar,
+            true
+        );
+        
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+const PORT = process.env.PORT || 5000;
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🌐 Server running on port ${PORT}`);
+    console.log(`🌐 Web server running on port ${PORT}`);
 });
 
-client.login(process.env.token).catch(err => {
-    console.error('❌ Failed to login:', err.message);
-    console.error('تأكد من إضافة token في Replit Secrets!');
-});
-
-process.on('unhandledRejection', (reason, promise) => {
-    console.error('⚠️ Unhandled Rejection at:', promise, 'reason:', reason);
-});
-
-process.on('uncaughtException', (error) => {
-    console.error('⚠️ Uncaught Exception:', error.message);
-});
+client.login(process.env.token);
