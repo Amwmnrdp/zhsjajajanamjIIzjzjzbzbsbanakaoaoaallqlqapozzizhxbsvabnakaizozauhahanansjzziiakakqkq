@@ -1,10 +1,69 @@
 const express = require('express');
 const path = require('path');
+const cookieParser = require('cookie-parser');
+const { v4: uuidv4 } = require('uuid');
 const app = express();
 const { Client, GatewayIntentBits, EmbedBuilder, PermissionsBitField } = require('discord.js');
 
 app.use(express.json({ limit: '10mb' }));
+app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
+
+const sessions = new Map();
+const userToSessionToken = new Map();
+
+function getSessionUser(req) {
+    const sessionToken = req.cookies?.session_token;
+    if (!sessionToken) return null;
+    
+    const sessionData = sessions.get(sessionToken);
+    if (!sessionData) return null;
+    
+    if (Date.now() > sessionData.expires_at) {
+        sessions.delete(sessionToken);
+        userToSessionToken.delete(sessionData.user.discord_id);
+        return null;
+    }
+    
+    return sessionData.user;
+}
+
+function createSession(res, userData) {
+    const existingToken = userToSessionToken.get(userData.discord_id);
+    if (existingToken) {
+        sessions.delete(existingToken);
+    }
+    
+    const token = uuidv4();
+    const expiresAt = Date.now() + (5 * 60 * 60 * 1000);
+    
+    sessions.set(token, {
+        user: userData,
+        expires_at: expiresAt,
+        created_at: Date.now()
+    });
+    userToSessionToken.set(userData.discord_id, token);
+    
+    res.cookie('session_token', token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        maxAge: 5 * 60 * 60 * 1000,
+        sameSite: 'lax'
+    });
+    return token;
+}
+
+function cleanupExpiredSessions() {
+    const now = Date.now();
+    for (const [token, sessionData] of sessions.entries()) {
+        if (now > sessionData.expires_at) {
+            sessions.delete(token);
+            userToSessionToken.delete(sessionData.user.discord_id);
+        }
+    }
+}
+
+setInterval(cleanupExpiredSessions, 10 * 60 * 1000);
 
 const db = require('./src/utils/database');
 const { SUPPORTED_LANGUAGES, COMMAND_DEFINITIONS, OWNER_ONLY_COMMANDS, PUBLIC_COMMANDS, EMOJI_PERMISSION_COMMANDS } = require('./src/utils/constants');
@@ -40,6 +99,8 @@ const WEBSITE_URL = process.env.REPLIT_DEV_DOMAIN
     ? `https://${process.env.REPLIT_DEV_DOMAIN}`
     : 'http://localhost:3000';
 
+const OWNER_ID = '815701106235670558';
+
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
@@ -59,8 +120,6 @@ const stickerRenameSessions = new Map();
 const convertedEmojisToStickers = new Map();
 const convertedImagesToStickers = new Map();
 const convertedStickersToEmojis = new Map();
-
-let currentVerifiedUser = null;
 
 async function initializeBot() {
     try {
@@ -441,9 +500,6 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-app.get('/admin', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'admin.html'));
-});
 
 app.get('/api/health', (req, res) => {
     res.json({ status: 'online', bot: 'ProEmoji' });
@@ -459,16 +515,19 @@ app.get('/api/stats', async (req, res) => {
 
 app.get('/api/user-profile', async (req, res) => {
     try {
-        if (currentVerifiedUser) {
-            const isUserAdmin = await db.isAdmin(currentVerifiedUser.discord_id);
-            const verifiedUser = await db.getVerifiedUser(currentVerifiedUser.discord_id);
-            const verifiedAt = verifiedUser ? new Date(verifiedUser.verified_at).getTime() : null;
-            const expiresAt = verifiedAt ? verifiedAt + (5 * 60 * 60 * 1000) : null;
+        const sessionUser = getSessionUser(req);
+        
+        if (sessionUser) {
+            const isUserAdmin = await db.isAdmin(sessionUser.discord_id);
+            const isUserOwner = await db.isOwner(sessionUser.discord_id);
+            const verifiedUser = await db.getVerifiedUser(sessionUser.discord_id);
+            const expiresAt = verifiedUser ? verifiedUser.expires_at_ms : null;
             
             res.json({
-                ...currentVerifiedUser,
+                ...sessionUser,
                 is_admin: isUserAdmin,
-                verified_at: verifiedAt,
+                is_owner: isUserOwner,
+                is_site_owner: sessionUser.discord_id === OWNER_ID,
                 expires_at: expiresAt
             });
         } else {
@@ -537,17 +596,19 @@ app.get('/auth/discord/callback', async (req, res) => {
             ? `https://cdn.discordapp.com/avatars/${userData.id}/${userData.avatar}.png`
             : 'https://cdn.discordapp.com/embed/avatars/0.png';
         
-        await db.verifyUserDb(userData.id, userData.username, avatarUrl);
+        const expiresAt = await db.verifyUserDb(userData.id, userData.username, avatarUrl);
         
-        currentVerifiedUser = {
+        const sessionUserData = {
             discord_id: userData.id,
             username: userData.username,
             avatar: avatarUrl
         };
         
+        createSession(res, sessionUserData);
+        
         console.log(`✅ User verified: ${userData.username} (${userData.id})`);
         
-        res.redirect('/#home');
+        res.redirect(`/#activation?verified=true&expires=${expiresAt}`);
     } catch (error) {
         console.error('OAuth2 error:', error);
         res.redirect('/#activation?error=oauth_failed');
@@ -565,15 +626,16 @@ app.get('/api/suggestions', async (req, res) => {
 
 app.post('/api/suggestions', async (req, res) => {
     try {
-        if (!currentVerifiedUser) {
+        const sessionUser = getSessionUser(req);
+        if (!sessionUser) {
             return res.status(401).json({ error: 'Not verified' });
         }
         
         const { title, description } = req.body;
         const suggestion = await db.createSuggestion(
-            currentVerifiedUser.discord_id,
-            currentVerifiedUser.username,
-            currentVerifiedUser.avatar,
+            sessionUser.discord_id,
+            sessionUser.username,
+            sessionUser.avatar,
             title,
             description
         );
@@ -585,14 +647,15 @@ app.post('/api/suggestions', async (req, res) => {
 
 app.delete('/api/suggestions/:id', async (req, res) => {
     try {
-        if (!currentVerifiedUser) {
+        const sessionUser = getSessionUser(req);
+        if (!sessionUser) {
             return res.status(401).json({ error: 'Not verified' });
         }
         
         const suggestion = await db.getSuggestionById(req.params.id);
-        const isUserAdmin = await db.isAdmin(currentVerifiedUser.discord_id);
+        const isUserAdmin = await db.isAdmin(sessionUser.discord_id);
         
-        if (suggestion.discord_id !== currentVerifiedUser.discord_id && !isUserAdmin) {
+        if (suggestion.discord_id !== sessionUser.discord_id && !isUserAdmin) {
             return res.status(403).json({ error: 'Not authorized' });
         }
         
@@ -605,12 +668,13 @@ app.delete('/api/suggestions/:id', async (req, res) => {
 
 app.post('/api/suggestions/:id/like', async (req, res) => {
     try {
-        if (!currentVerifiedUser) {
+        const sessionUser = getSessionUser(req);
+        if (!sessionUser) {
             return res.status(401).json({ error: 'Not verified' });
         }
         
         const { is_like } = req.body;
-        await db.toggleLike(currentVerifiedUser.discord_id, 'suggestion', req.params.id, is_like);
+        await db.toggleLike(sessionUser.discord_id, 'suggestion', req.params.id, is_like);
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -628,15 +692,16 @@ app.get('/api/suggestions/:id/comments', async (req, res) => {
 
 app.post('/api/suggestions/:id/comments', async (req, res) => {
     try {
-        if (!currentVerifiedUser) {
+        const sessionUser = getSessionUser(req);
+        if (!sessionUser) {
             return res.status(401).json({ error: 'Not verified' });
         }
         
         const { content } = req.body;
         const comment = await db.addComment(
-            currentVerifiedUser.discord_id,
-            currentVerifiedUser.username,
-            currentVerifiedUser.avatar,
+            sessionUser.discord_id,
+            sessionUser.username,
+            sessionUser.avatar,
             'suggestion',
             req.params.id,
             content
@@ -658,15 +723,16 @@ app.get('/api/reports', async (req, res) => {
 
 app.post('/api/reports', async (req, res) => {
     try {
-        if (!currentVerifiedUser) {
+        const sessionUser = getSessionUser(req);
+        if (!sessionUser) {
             return res.status(401).json({ error: 'Not verified' });
         }
         
         const { title, description, image_url } = req.body;
         const report = await db.createReport(
-            currentVerifiedUser.discord_id,
-            currentVerifiedUser.username,
-            currentVerifiedUser.avatar,
+            sessionUser.discord_id,
+            sessionUser.username,
+            sessionUser.avatar,
             title,
             description,
             image_url
@@ -679,14 +745,15 @@ app.post('/api/reports', async (req, res) => {
 
 app.delete('/api/reports/:id', async (req, res) => {
     try {
-        if (!currentVerifiedUser) {
+        const sessionUser = getSessionUser(req);
+        if (!sessionUser) {
             return res.status(401).json({ error: 'Not verified' });
         }
         
         const report = await db.getReportById(req.params.id);
-        const isUserAdmin = await db.isAdmin(currentVerifiedUser.discord_id);
+        const isUserAdmin = await db.isAdmin(sessionUser.discord_id);
         
-        if (report.discord_id !== currentVerifiedUser.discord_id && !isUserAdmin) {
+        if (report.discord_id !== sessionUser.discord_id && !isUserAdmin) {
             return res.status(403).json({ error: 'Not authorized' });
         }
         
@@ -699,12 +766,13 @@ app.delete('/api/reports/:id', async (req, res) => {
 
 app.post('/api/reports/:id/like', async (req, res) => {
     try {
-        if (!currentVerifiedUser) {
+        const sessionUser = getSessionUser(req);
+        if (!sessionUser) {
             return res.status(401).json({ error: 'Not verified' });
         }
         
         const { is_like } = req.body;
-        await db.toggleLike(currentVerifiedUser.discord_id, 'report', req.params.id, is_like);
+        await db.toggleLike(sessionUser.discord_id, 'report', req.params.id, is_like);
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -722,15 +790,16 @@ app.get('/api/reports/:id/comments', async (req, res) => {
 
 app.post('/api/reports/:id/comments', async (req, res) => {
     try {
-        if (!currentVerifiedUser) {
+        const sessionUser = getSessionUser(req);
+        if (!sessionUser) {
             return res.status(401).json({ error: 'Not verified' });
         }
         
         const { content } = req.body;
         const comment = await db.addComment(
-            currentVerifiedUser.discord_id,
-            currentVerifiedUser.username,
-            currentVerifiedUser.avatar,
+            sessionUser.discord_id,
+            sessionUser.username,
+            sessionUser.avatar,
             'report',
             req.params.id,
             content
@@ -743,12 +812,13 @@ app.post('/api/reports/:id/comments', async (req, res) => {
 
 app.delete('/api/comments/:id', async (req, res) => {
     try {
-        if (!currentVerifiedUser) {
+        const sessionUser = getSessionUser(req);
+        if (!sessionUser) {
             return res.status(401).json({ error: 'Not verified' });
         }
         
-        const isUserAdmin = await db.isAdmin(currentVerifiedUser.discord_id);
-        await db.deleteComment(req.params.id, currentVerifiedUser.discord_id, isUserAdmin);
+        const isUserAdmin = await db.isAdmin(sessionUser.discord_id);
+        await db.deleteComment(req.params.id, sessionUser.discord_id, isUserAdmin);
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -766,12 +836,14 @@ app.get('/api/admins', async (req, res) => {
 
 app.post('/api/admins', async (req, res) => {
     try {
-        if (!currentVerifiedUser) {
+        const sessionUser = getSessionUser(req);
+        if (!sessionUser) {
             return res.status(401).json({ error: 'Not verified' });
         }
         
-        const isUserOwner = await db.isOwner(currentVerifiedUser.discord_id);
-        if (!isUserOwner) {
+        const isUserOwner = await db.isOwner(sessionUser.discord_id);
+        const isSiteOwner = sessionUser.discord_id === OWNER_ID;
+        if (!isUserOwner && !isSiteOwner) {
             return res.status(403).json({ error: 'Only the owner can add admins' });
         }
         
@@ -785,12 +857,14 @@ app.post('/api/admins', async (req, res) => {
 
 app.delete('/api/admins/:discord_id', async (req, res) => {
     try {
-        if (!currentVerifiedUser) {
+        const sessionUser = getSessionUser(req);
+        if (!sessionUser) {
             return res.status(401).json({ error: 'Not verified' });
         }
         
-        const isUserOwner = await db.isOwner(currentVerifiedUser.discord_id);
-        if (!isUserOwner) {
+        const isUserOwner = await db.isOwner(sessionUser.discord_id);
+        const isSiteOwner = sessionUser.discord_id === OWNER_ID;
+        if (!isUserOwner && !isSiteOwner) {
             return res.status(403).json({ error: 'Only the owner can remove admins' });
         }
         
@@ -803,7 +877,8 @@ app.delete('/api/admins/:discord_id', async (req, res) => {
 
 app.post('/api/set-owner', async (req, res) => {
     try {
-        if (!currentVerifiedUser) {
+        const sessionUser = getSessionUser(req);
+        if (!sessionUser) {
             return res.status(401).json({ error: 'Not verified' });
         }
         
@@ -815,9 +890,9 @@ app.post('/api/set-owner', async (req, res) => {
         }
         
         await db.addAdmin(
-            currentVerifiedUser.discord_id,
-            currentVerifiedUser.username,
-            currentVerifiedUser.avatar,
+            sessionUser.discord_id,
+            sessionUser.username,
+            sessionUser.avatar,
             true
         );
         

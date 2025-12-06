@@ -5,7 +5,6 @@ const menuLinks = document.querySelectorAll('.menu-link');
 const contentSections = document.querySelectorAll('.content-section');
 const tabBtns = document.querySelectorAll('.tab-btn');
 const commandsLists = document.querySelectorAll('.commands-list');
-const activateBtn = document.getElementById('activateBtn');
 
 const postSuggestionBtn = document.getElementById('postSuggestionBtn');
 const postReportBtn = document.getElementById('postReportBtn');
@@ -26,12 +25,15 @@ const imagePreview = document.getElementById('imagePreview');
 const previewImg = document.getElementById('previewImg');
 const removeImageBtn = document.getElementById('removeImage');
 
+const OWNER_ID = '815701106235670558';
+
 let currentUser = null;
 let isAdmin = false;
+let isOwner = false;
+let isSiteOwner = false;
 let uploadedImageData = null;
 let timerInterval = null;
 let verificationExpiresAt = null;
-
 let scrollPosition = 0;
 
 hamburgerBtn.addEventListener('click', () => {
@@ -86,6 +88,7 @@ function showSection(sectionId) {
         targetSection.classList.add('active');
         if (sectionId === 'suggestions') loadSuggestions();
         if (sectionId === 'reports') loadReports();
+        if (sectionId === 'admin') loadAdminPanel();
     }
 }
 
@@ -103,7 +106,6 @@ tabBtns.forEach(btn => {
         });
     });
 });
-
 
 async function fetchStats() {
     try {
@@ -124,14 +126,16 @@ async function fetchUserProfile() {
         if (data.discord_id) {
             currentUser = data;
             isAdmin = data.is_admin || false;
+            isOwner = data.is_owner || false;
+            isSiteOwner = data.is_site_owner || data.discord_id === OWNER_ID;
             verificationExpiresAt = data.expires_at || null;
         }
         
         const avatarEl = document.getElementById('userAvatar');
         const nameEl = document.getElementById('userName');
+        const userBadge = document.getElementById('userBadge');
+        const userRole = document.getElementById('userRole');
         const adminPanelLink = document.getElementById('adminPanelLink');
-        const activationCard = document.getElementById('activationCard');
-        const verifiedCard = document.getElementById('verifiedCard');
         
         if (data.avatar) {
             avatarEl.src = data.avatar;
@@ -141,21 +145,23 @@ async function fetchUserProfile() {
         }
         nameEl.textContent = data.username || 'Guest';
         
-        if (adminPanelLink && isAdmin) {
-            adminPanelLink.style.display = 'block';
+        if (isSiteOwner || isOwner) {
+            userBadge.innerHTML = '<i class="fas fa-crown"></i>';
+            userBadge.className = 'user-badge owner-badge';
+            userRole.textContent = 'Owner';
+            userRole.className = 'user-role owner-role';
+        } else if (isAdmin) {
+            userBadge.innerHTML = '<i class="fas fa-shield-alt"></i>';
+            userBadge.className = 'user-badge admin-badge';
+            userRole.textContent = 'Admin';
+            userRole.className = 'user-role admin-role';
         }
         
-        if (currentUser && verificationExpiresAt && activationCard && verifiedCard) {
-            const now = Date.now();
-            if (verificationExpiresAt > now) {
-                activationCard.style.display = 'none';
-                verifiedCard.style.display = 'block';
-                startVerificationTimer();
-            } else {
-                activationCard.style.display = 'block';
-                verifiedCard.style.display = 'none';
-            }
+        if (adminPanelLink && (isSiteOwner || isOwner || isAdmin)) {
+            adminPanelLink.classList.remove('hidden');
         }
+        
+        handleActivationState();
     } catch (error) {
         console.error('Error fetching user profile:', error);
         document.getElementById('userAvatar').src = 'https://cdn.discordapp.com/embed/avatars/0.png';
@@ -163,29 +169,121 @@ async function fetchUserProfile() {
     }
 }
 
+function handleActivationState() {
+    const activationCard = document.getElementById('activationCard');
+    const successCard = document.getElementById('successCard');
+    const cooldownCard = document.getElementById('cooldownCard');
+    
+    const urlParams = new URLSearchParams(window.location.hash.split('?')[1] || '');
+    const justVerified = urlParams.get('verified') === 'true';
+    const expiresParam = urlParams.get('expires');
+    
+    if (justVerified && expiresParam) {
+        verificationExpiresAt = parseInt(expiresParam);
+        showSuccessAnimation();
+        
+        if (window.history.replaceState) {
+            window.history.replaceState(null, null, '/#activation');
+        }
+        return;
+    }
+    
+    if (currentUser && verificationExpiresAt) {
+        const now = Date.now();
+        if (verificationExpiresAt > now) {
+            activationCard.style.display = 'none';
+            successCard.style.display = 'none';
+            cooldownCard.style.display = 'block';
+            startVerificationTimer();
+        } else {
+            activationCard.style.display = 'block';
+            successCard.style.display = 'none';
+            cooldownCard.style.display = 'none';
+        }
+    }
+}
+
+function showSuccessAnimation() {
+    const activationCard = document.getElementById('activationCard');
+    const successCard = document.getElementById('successCard');
+    const cooldownCard = document.getElementById('cooldownCard');
+    
+    activationCard.style.display = 'none';
+    cooldownCard.style.display = 'none';
+    successCard.style.display = 'block';
+    
+    createParticles();
+    
+    setTimeout(() => {
+        successCard.style.display = 'none';
+        cooldownCard.style.display = 'block';
+        startVerificationTimer();
+    }, 4000);
+}
+
+function createParticles() {
+    const container = document.getElementById('successParticles');
+    container.innerHTML = '';
+    
+    const colors = ['#10b981', '#34d399', '#6ee7b7', '#a7f3d0', '#ffd700'];
+    
+    for (let i = 0; i < 30; i++) {
+        const particle = document.createElement('div');
+        particle.className = 'particle';
+        particle.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+        particle.style.left = '50%';
+        particle.style.top = '40%';
+        
+        const angle = (Math.random() * 360) * (Math.PI / 180);
+        const distance = 100 + Math.random() * 150;
+        const tx = Math.cos(angle) * distance;
+        const ty = Math.sin(angle) * distance;
+        
+        particle.style.setProperty('--tx', `${tx}px`);
+        particle.style.setProperty('--ty', `${ty}px`);
+        particle.style.animationDelay = `${Math.random() * 0.5}s`;
+        
+        container.appendChild(particle);
+    }
+}
+
 function startVerificationTimer() {
     if (timerInterval) clearInterval(timerInterval);
+    
+    const circle = document.getElementById('timerCircle');
+    const circumference = 2 * Math.PI * 90;
+    
+    if (circle) {
+        circle.style.strokeDasharray = `${circumference} ${circumference}`;
+    }
+    
+    const totalDuration = 5 * 60 * 60 * 1000;
     
     function updateTimer() {
         const now = Date.now();
         const remaining = verificationExpiresAt - now;
         
-        const timerDisplay = document.getElementById('verificationTimer');
         const hoursEl = document.getElementById('timerHours');
         const minutesEl = document.getElementById('timerMinutes');
         const secondsEl = document.getElementById('timerSeconds');
+        const cooldownBtn = document.getElementById('cooldownBtn');
         
         if (remaining <= 0) {
-            if (timerDisplay) timerDisplay.classList.add('timer-expired');
             if (hoursEl) hoursEl.textContent = '00';
             if (minutesEl) minutesEl.textContent = '00';
             if (secondsEl) secondsEl.textContent = '00';
-            clearInterval(timerInterval);
             
-            const activationCard = document.getElementById('activationCard');
-            const verifiedCard = document.getElementById('verifiedCard');
-            if (activationCard) activationCard.style.display = 'block';
-            if (verifiedCard) verifiedCard.style.display = 'none';
+            if (cooldownBtn) {
+                cooldownBtn.classList.remove('btn-disabled');
+                cooldownBtn.removeAttribute('disabled');
+                cooldownBtn.innerHTML = '<i class="fas fa-unlock"></i> Verify Again';
+            }
+            
+            if (circle) {
+                circle.style.strokeDashoffset = 0;
+            }
+            
+            clearInterval(timerInterval);
             return;
         }
         
@@ -196,10 +294,191 @@ function startVerificationTimer() {
         if (hoursEl) hoursEl.textContent = String(hours).padStart(2, '0');
         if (minutesEl) minutesEl.textContent = String(minutes).padStart(2, '0');
         if (secondsEl) secondsEl.textContent = String(seconds).padStart(2, '0');
+        
+        if (circle) {
+            const progress = remaining / totalDuration;
+            const offset = circumference * (1 - progress);
+            circle.style.strokeDashoffset = offset;
+        }
     }
     
     updateTimer();
     timerInterval = setInterval(updateTimer, 1000);
+}
+
+async function loadAdminPanel() {
+    const container = document.getElementById('adminPanelContainer');
+    
+    if (!currentUser) {
+        container.innerHTML = `
+            <div class="admin-card access-denied-card">
+                <i class="fas fa-lock"></i>
+                <h3>Not Logged In</h3>
+                <p>Please verify your Discord account to access the admin panel.</p>
+            </div>
+        `;
+        return;
+    }
+    
+    if (!isSiteOwner && !isOwner && !isAdmin) {
+        container.innerHTML = `
+            <div class="admin-card access-denied-card">
+                <i class="fas fa-ban"></i>
+                <h3>Access Denied</h3>
+                <p>You do not have permission to access the admin panel.</p>
+            </div>
+        `;
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/admins');
+        const admins = await response.json();
+        
+        let html = '';
+        
+        if (isSiteOwner || isOwner) {
+            html += `
+                <div class="admin-card">
+                    <div class="admin-card-header">
+                        <i class="fas fa-user-plus"></i>
+                        <h3>Add Administrator</h3>
+                    </div>
+                    <form class="add-admin-form" id="addAdminForm">
+                        <input type="text" id="newAdminId" placeholder="Discord User ID (numbers only)" 
+                               pattern="[0-9]+" inputmode="numeric" required>
+                        <button type="submit" class="btn-add-admin">
+                            <i class="fas fa-plus"></i> Add Admin
+                        </button>
+                    </form>
+                </div>
+            `;
+        }
+        
+        html += `
+            <div class="admin-card">
+                <div class="admin-card-header">
+                    <i class="fas fa-users-cog"></i>
+                    <h3>Administrators</h3>
+                </div>
+                <div class="admin-list" id="adminList">
+        `;
+        
+        if (admins.length === 0) {
+            html += `
+                <div class="empty-admin-list">
+                    <i class="fas fa-users"></i>
+                    <p>No administrators yet.</p>
+                </div>
+            `;
+        } else {
+            admins.forEach(admin => {
+                const isAdminOwner = admin.is_owner;
+                const badgeClass = isAdminOwner ? 'owner' : 'admin';
+                const badgeIcon = isAdminOwner ? 'fa-crown' : 'fa-shield-alt';
+                const roleText = isAdminOwner ? 'Owner' : 'Admin';
+                
+                html += `
+                    <div class="admin-item" data-id="${admin.discord_id}">
+                        <div class="admin-avatar-container">
+                            <img src="${admin.discord_avatar || 'https://cdn.discordapp.com/embed/avatars/0.png'}" 
+                                 alt="Avatar" class="admin-avatar">
+                            <span class="admin-item-badge ${badgeClass}">
+                                <i class="fas ${badgeIcon}"></i>
+                            </span>
+                        </div>
+                        <div class="admin-info">
+                            <div class="admin-name">
+                                ${escapeHtml(admin.discord_username || 'Unknown')}
+                                <span class="role-tag ${badgeClass}">${roleText}</span>
+                            </div>
+                            <div class="admin-id">${admin.discord_id}</div>
+                        </div>
+                        ${(isSiteOwner || isOwner) && !isAdminOwner ? `
+                            <button class="btn-remove-admin" data-id="${admin.discord_id}" title="Remove Admin">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        ` : ''}
+                    </div>
+                `;
+            });
+        }
+        
+        html += `
+                </div>
+            </div>
+        `;
+        
+        container.innerHTML = html;
+        
+        const addAdminForm = document.getElementById('addAdminForm');
+        if (addAdminForm) {
+            addAdminForm.addEventListener('submit', handleAddAdmin);
+        }
+        
+        document.querySelectorAll('.btn-remove-admin').forEach(btn => {
+            btn.addEventListener('click', () => handleRemoveAdmin(btn.dataset.id));
+        });
+        
+    } catch (error) {
+        container.innerHTML = `
+            <div class="admin-card access-denied-card">
+                <i class="fas fa-exclamation-triangle"></i>
+                <h3>Error</h3>
+                <p>Failed to load admin panel. Please try again.</p>
+            </div>
+        `;
+    }
+}
+
+async function handleAddAdmin(e) {
+    e.preventDefault();
+    
+    const discordId = document.getElementById('newAdminId').value.trim();
+    
+    if (!/^\d+$/.test(discordId)) {
+        alert('Please enter a valid Discord User ID (numbers only)');
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/admins', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                discord_id: discordId,
+                username: 'Admin',
+                avatar: null
+            })
+        });
+        
+        if (response.ok) {
+            document.getElementById('newAdminId').value = '';
+            loadAdminPanel();
+        } else {
+            const data = await response.json();
+            alert(data.error || 'Failed to add admin');
+        }
+    } catch (error) {
+        alert('Error adding admin');
+    }
+}
+
+async function handleRemoveAdmin(discordId) {
+    if (!confirm('Are you sure you want to remove this admin?')) return;
+    
+    try {
+        const response = await fetch(`/api/admins/${discordId}`, { method: 'DELETE' });
+        
+        if (response.ok) {
+            loadAdminPanel();
+        } else {
+            const data = await response.json();
+            alert(data.error || 'Failed to remove admin');
+        }
+    } catch (error) {
+        alert('Error removing admin');
+    }
 }
 
 document.querySelectorAll('.close').forEach(closeBtn => {
@@ -405,8 +684,8 @@ function createPostCard(post, type) {
         day: 'numeric'
     });
     
-    const isOwner = currentUser && currentUser.discord_id === post.discord_id;
-    const canDelete = isAdmin || isOwner;
+    const isPostOwner = currentUser && currentUser.discord_id === post.discord_id;
+    const canDelete = isAdmin || isOwner || isSiteOwner || isPostOwner;
     
     return `
         <div class="post-card" data-id="${post.id}" data-type="${type}">
@@ -521,7 +800,7 @@ function createCommentItem(comment) {
         minute: '2-digit'
     });
     
-    const canDelete = isAdmin || (currentUser && currentUser.discord_id === comment.discord_id);
+    const canDelete = isAdmin || isOwner || isSiteOwner || (currentUser && currentUser.discord_id === comment.discord_id);
     
     return `
         <div class="comment-item" data-id="${comment.id}">
@@ -611,8 +890,9 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
-if (window.location.hash === '#activation') {
-    showSection('activation');
+const hashSection = window.location.hash.split('?')[0].replace('#', '');
+if (hashSection && ['home', 'activation', 'statistics', 'commands', 'suggestions', 'reports', 'admin'].includes(hashSection)) {
+    showSection(hashSection);
 }
 
 fetchStats();

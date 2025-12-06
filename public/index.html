@@ -8,7 +8,6 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
-    <!-- Hamburger Menu -->
     <div class="hamburger-menu">
         <div class="hamburger-btn" id="hamburgerBtn">
             <span></span>
@@ -17,11 +16,16 @@
         </div>
     </div>
 
-    <!-- Sidebar Menu -->
     <nav class="sidebar" id="sidebar">
         <div class="user-profile">
-            <img id="userAvatar" src="" alt="User Avatar" class="user-avatar">
-            <span id="userName" class="user-name">Loading...</span>
+            <div class="avatar-container">
+                <img id="userAvatar" src="" alt="User Avatar" class="user-avatar">
+                <span id="userBadge" class="user-badge hidden"></span>
+            </div>
+            <div class="user-info-container">
+                <span id="userName" class="user-name">Loading...</span>
+                <span id="userRole" class="user-role hidden"></span>
+            </div>
         </div>
         <ul class="menu-list">
             <li><a href="#home" class="menu-link" data-section="home"><i class="fas fa-home"></i> Home</a></li>
@@ -30,16 +34,13 @@
             <li><a href="#commands" class="menu-link" data-section="commands"><i class="fas fa-terminal"></i> Commands</a></li>
             <li><a href="#suggestions" class="menu-link" data-section="suggestions"><i class="fas fa-lightbulb"></i> Suggestions</a></li>
             <li><a href="#reports" class="menu-link" data-section="reports"><i class="fas fa-bug"></i> Issue Reports</a></li>
-            <li id="adminPanelLink" style="display: none;"><a href="/admin.html" class="menu-link"><i class="fas fa-crown"></i> Admin Panel</a></li>
+            <li id="adminPanelLink" class="admin-menu-item hidden"><a href="#admin" class="menu-link admin-link" data-section="admin"><i class="fas fa-crown"></i> Admin Panel</a></li>
         </ul>
     </nav>
 
-    <!-- Overlay -->
     <div class="overlay" id="overlay"></div>
 
-    <!-- Main Content -->
     <main class="main-content">
-        <!-- Home Section -->
         <section id="home" class="content-section active">
             <div class="header-hero">
                 <h1>🎨 ProEmoji</h1>
@@ -108,7 +109,6 @@
             </div>
         </section>
 
-        <!-- Activation Section -->
         <section id="activation" class="content-section">
             <h2><i class="fas fa-shield-alt" style="margin-right: 10px;"></i>Activation</h2>
             <div class="activation-hero">
@@ -124,22 +124,49 @@
                     </a>
                     <p class="verification-note">You will be redirected to Discord to authorize your account</p>
                 </div>
-                <div class="activation-main-card verified-card" id="verifiedCard" style="display: none;">
-                    <div class="activation-icon verified-icon">✅</div>
-                    <h3>Account Verified!</h3>
-                    <p>Your Discord account is verified. You can now use all ProEmoji commands.</p>
-                    <div class="timer-container">
-                        <div class="timer-label">Time until re-verification:</div>
-                        <div class="timer-display" id="verificationTimer">
-                            <span id="timerHours">00</span>:<span id="timerMinutes">00</span>:<span id="timerSeconds">00</span>
+                
+                <div class="activation-main-card success-card" id="successCard" style="display: none;">
+                    <div class="success-particles" id="successParticles"></div>
+                    <div class="success-checkmark">
+                        <div class="check-icon">
+                            <span class="icon-line line-tip"></span>
+                            <span class="icon-line line-long"></span>
+                            <div class="icon-circle"></div>
+                            <div class="icon-fix"></div>
                         </div>
                     </div>
-                    <p class="verification-note">You will need to verify again when the timer expires</p>
+                    <h3 class="success-title">Account Verified Successfully!</h3>
+                    <p class="success-message">Your Discord account has been activated. You can now use all ProEmoji commands!</p>
+                </div>
+                
+                <div class="activation-main-card cooldown-card" id="cooldownCard" style="display: none;">
+                    <div class="cooldown-glow"></div>
+                    <div class="activation-icon cooldown-icon">⏳</div>
+                    <h3>Verification Active</h3>
+                    <p>Your account is verified. Wait for the cooldown to verify again.</p>
+                    
+                    <div class="timer-container">
+                        <div class="timer-progress-ring">
+                            <svg class="progress-ring" width="200" height="200">
+                                <circle class="progress-ring-circle-bg" stroke-width="8" fill="transparent" r="90" cx="100" cy="100"/>
+                                <circle class="progress-ring-circle" id="timerCircle" stroke-width="8" fill="transparent" r="90" cx="100" cy="100"/>
+                            </svg>
+                            <div class="timer-display" id="verificationTimer">
+                                <span id="timerHours">00</span>:<span id="timerMinutes">00</span>:<span id="timerSeconds">00</span>
+                            </div>
+                        </div>
+                        <div class="timer-label">Time until re-verification available</div>
+                    </div>
+                    
+                    <a href="/auth/discord" class="btn-activate btn-disabled" id="cooldownBtn" disabled>
+                        <i class="fas fa-lock"></i>
+                        Verification Cooldown Active
+                    </a>
+                    <p class="verification-note">Button will unlock when the timer expires</p>
                 </div>
             </div>
         </section>
 
-        <!-- Statistics Section -->
         <section id="statistics" class="content-section">
             <h2><i class="fas fa-chart-bar" style="margin-right: 10px;"></i>Statistics</h2>
             <div class="stats-grid">
@@ -158,7 +185,6 @@
             </div>
         </section>
 
-        <!-- Commands Section -->
         <section id="commands" class="content-section">
             <h2><i class="fas fa-terminal" style="margin-right: 10px;"></i>All Commands</h2>
             <div class="commands-tabs">
@@ -194,7 +220,6 @@
             </div>
         </section>
 
-        <!-- Suggestions Section -->
         <section id="suggestions" class="content-section">
             <h2><i class="fas fa-lightbulb" style="margin-right: 10px;"></i>Suggestions</h2>
             <p class="section-description">Share your ideas to improve ProEmoji! Vote on suggestions and leave comments.</p>
@@ -206,7 +231,6 @@
             </div>
         </section>
 
-        <!-- Issue Reports Section -->
         <section id="reports" class="content-section">
             <h2><i class="fas fa-bug" style="margin-right: 10px;"></i>Issue Reports</h2>
             <p class="section-description">Report bugs and issues you've encountered. Include screenshots to help us fix them faster!</p>
@@ -218,12 +242,22 @@
             </div>
         </section>
 
+        <section id="admin" class="content-section">
+            <div class="admin-header-section">
+                <h2><i class="fas fa-crown" style="margin-right: 10px;"></i>Admin Panel</h2>
+                <p class="admin-subtitle">Manage administrators for ProEmoji</p>
+            </div>
+            
+            <div class="admin-panel-container" id="adminPanelContainer">
+                <div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i> Loading admin panel...</div>
+            </div>
+        </section>
+
         <footer>
             <p>ProEmoji &copy; 2024</p>
         </footer>
     </main>
 
-    <!-- Suggestion Modal -->
     <div class="modal" id="suggestionModal">
         <div class="modal-content">
             <span class="close" data-modal="suggestionModal">&times;</span>
@@ -244,7 +278,6 @@
         </div>
     </div>
 
-    <!-- Report Modal -->
     <div class="modal" id="reportModal">
         <div class="modal-content">
             <span class="close" data-modal="reportModal">&times;</span>
@@ -279,7 +312,6 @@
         </div>
     </div>
 
-    <!-- Comments Modal -->
     <div class="modal" id="commentsModal">
         <div class="modal-content modal-comments">
             <span class="close" data-modal="commentsModal">&times;</span>
