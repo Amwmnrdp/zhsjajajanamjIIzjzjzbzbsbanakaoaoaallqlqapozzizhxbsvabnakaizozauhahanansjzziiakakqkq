@@ -90,14 +90,32 @@ const language = require('./src/commands/storage/language');
 const help = require('./src/commands/storage/help');
 
 const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID;
-const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET;
-const REDIRECT_URI = process.env.REPLIT_DEV_DOMAIN 
-    ? `https://${process.env.REPLIT_DEV_DOMAIN}/auth/discord/callback`
-    : 'http://localhost:3000/auth/discord/callback';
+const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_REPLITT_URI |kT_URI = process.env.REDIRECT REDIRECT_URI = process.env.REDIRECT_URI || 
+    (process.env.REPLIT_DEV_DOMAIN 
+        ? `https://${process.env.REPLIT_DEV_DOMAIN}/auth/discord/callback`
+        : 'http://localhost:3000/auth/discord/callback');
+
+const REDIRECT_URI = process.env.REDIRECT_URI || 
+    (process.env.REPLIT_DEV_DOMAIN 
+        ? `https://${process.env.REPLIT_DEV_DOMAIN}/auth/discord/callback`
+        : 'http://localhost:3000/auth/discord/callback');
 
 const WEBSITE_URL = process.env.REPLIT_DEV_DOMAIN 
     ? `https://${process.env.REPLIT_DEV_DOMAIN}`
     : 'http://localhost:3000';
+
+// ✅ أضف هذا هنا
+console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+console.log('🔧 ProEmoji - Environment Configuration');
+console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+console.log('NODE_ENV:', process.env.NODE_ENV || 'development');
+console.log('REPLIT_DEV_DOMAIN:', process.env.REPLIT_DEV_DOMAIN || '❌ Not Set');
+console.log('REDIRECT_URI (from env):', process.env.REDIRECT_URI || '❌ Not Set');
+console.log('REDIRECT_URI (final):', REDIRECT_URI);
+console.log('WEBSITE_URL:', WEBSITE_URL);
+console.log('DISCORD_CLIENT_ID:', DISCORD_CLIENT_ID ? '✅ Set' : '❌ Missing');
+console.log('DISCORD_CLIENT_SECRET:', DISCORD_CLIENT_SECRET ? '✅ Set' : '❌ Missing');
+console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
 const OWNER_ID = '815701106235670558';
 
@@ -517,6 +535,46 @@ app.get('/api/user-profile', async (req, res) => {
     try {
         const sessionUser = getSessionUser(req);
         
+        // ✅ أضف هذا للـ debugging
+        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        console.log('📊 User Profile Request:');
+        console.log('Session User:', sessionUser ? sessionUser.discord_id : 'None');
+        
+        if (sessionUser) {
+            const isUserAdmin = await db.isAdmin(sessionUser.discord_id);
+            const isUserOwner = await db.isOwner(sessionUser.discord_id);
+            const verifiedUser = await db.getVerifiedUser(sessionUser.discord_id);
+            
+            // ✅ أضف هذا للـ debugging
+            console.log('Verified User:', verifiedUser);
+            console.log('Expires At MS:', verifiedUser?.expires_at_ms);
+            
+            const expiresAt = verifiedUser ? verifiedUser.expires_at_ms : null;
+            
+            // ✅ أضف هذا للـ debugging
+            console.log('Final Expires At:', expiresAt);
+            console.log('Is Expired?', expiresAt ? (Date.now() > expiresAt) : 'N/A');
+            console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+            
+            res.json({
+                ...sessionUser,
+                is_admin: isUserAdmin,
+                is_owner: isUserOwner,
+                is_site_owner: sessionUser.discord_id === OWNER_ID,
+                expires_at: expiresAt
+            });
+        } else {
+            res.json({
+                username: 'Guest',
+                avatar: 'https://cdn.discordapp.com/embed/avatars/0.png'
+            });
+        }
+    } catch (error) {
+        console.error('❌ Error in /api/user-profile:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+        
         if (sessionUser) {
             const isUserAdmin = await db.isAdmin(sessionUser.discord_id);
             const isUserOwner = await db.isOwner(sessionUser.discord_id);
@@ -558,8 +616,24 @@ app.get('/auth/discord', (req, res) => {
 
 app.get('/auth/discord/callback', async (req, res) => {
     const code = req.query.code;
+    const error = req.query.error;
+    
+    // ✅ أضف هذا في البداية
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('🔐 OAuth Callback Triggered:');
+    console.log('Code:', code ? '✅ Present' : '❌ Missing');
+    console.log('Error:', error || 'None');
+    console.log('REDIRECT_URI:', REDIRECT_URI);
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    
+    // إذا المستخدم رفض الـ authorization
+    if (error === 'access_denied') {
+        console.log('❌ User denied authorization');
+        return res.redirect('/#activation?error=access_denied');
+    }
     
     if (!code) {
+        console.log('❌ No authorization code received');
         return res.redirect('/#activation?error=no_code');
     }
     
@@ -578,9 +652,96 @@ app.get('/auth/discord/callback', async (req, res) => {
         
         const tokenData = await tokenResponse.json();
         
-        if (!tokenData.access_token) {
+        // ✅ أضف هذا بعد token response
+        if (!tokenResponse.ok) {
+            console.error('❌ Token Exchange Failed:');
+            console.error('Status:', tokenResponse.status);
+            console.error('Response:', tokenData);
+            console.error('REDIRECT_URI used:', REDIRECT_URI);
             return res.redirect('/#activation?error=token_failed');
         }
+        
+        console.log('✅ Token received successfully');
+        
+        const userResponse = await fetch('https://discord.com/api/users/@me', {
+            headers: { Authorization: `Bearer ${tokenData.access_token}` }
+        });
+        
+        const userData = await userResponse.json();
+        
+        console.log('✅ User Data Retrieved:');
+        console.log('Username:', userData.username);
+        console.log('Discord ID:', userData.id);
+        
+        if (!userData.id) {
+            console.error('❌ No user ID in response');
+            return res.redirect('/#activation?error=user_failed');
+        }
+        
+        const avatarUrl = userData.avatar 
+            ? `https://cdn.discordapp.com/avatars/${userData.id}/${userData.avatar}.png`
+            : 'https://cdn.discordapp.com/embed/avatars/0.png';
+        
+        const expiresAt = await db.verifyUserDb(userData.id, userData.username, avatarUrl);
+        
+        console.log('✅ User Verified in Database:');
+        console.log('Discord ID:', userData.id);
+        console.log('Expires At (timestamp):', expiresAt);
+        console.log('Expires At (date):', new Date(expiresAt));
+        console.log('Current Time:', new Date());
+        
+        const sessionUserData = {
+            discord_id: userData.id,
+            username: userData.username,
+            avatar: avatarUrl
+        };
+        
+        createSession(res, sessionUserData);
+        
+        console.log('✅ Session Created Successfully');
+        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        
+        res.redirect(`/#activation?verified=true&expires=${expiresAt}`);
+    } catch (error) {
+        console.error('❌ OAuth2 Error:', error.message);
+        console.error('Stack:', error.stack);
+        res.redirect('/#activation?error=oauth_failed');
+    }
+});
+    
+    // إذا المستخدم رفض الـ authorization
+    if (error === 'access_denied') {
+        console.log('❌ User denied authorization');
+        return res.redirect('/#activation?error=access_denied');
+    }
+    
+    if (!code) {
+        console.log('❌ No authorization code received');
+        return res.redirect('/#activation?error=no_code');
+    }
+    
+    try {
+    const tokenResponse = await fetch('https://discord.com/api/oauth2/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+            client_id: DISCORD_CLIENT_ID,
+            client_secret: DISCORD_CLIENT_SECRET,
+            grant_type: 'authorization_code',
+            code: code,
+            redirect_uri: REDIRECT_URI  // ✅ تأكد أن هذا صحيح
+        })
+    });
+    
+    const tokenData = await tokenResponse.json();
+    
+    // ✅ أضف هذا للـ debugging
+    if (!tokenResponse.ok) {
+        console.error('❌ Token exchange failed:', tokenData);
+        console.error('Status:', tokenResponse.status);
+        console.error('Redirect URI used:', REDIRECT_URI);
+        return res.redirect('/#activation?error=token_failed');
+    }
         
         const userResponse = await fetch('https://discord.com/api/users/@me', {
             headers: { Authorization: `Bearer ${tokenData.access_token}` }
