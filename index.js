@@ -1,69 +1,10 @@
 const express = require('express');
 const path = require('path');
-const cookieParser = require('cookie-parser');
-const { v4: uuidv4 } = require('uuid');
 const app = express();
 const { Client, GatewayIntentBits, EmbedBuilder, PermissionsBitField } = require('discord.js');
 
 app.use(express.json({ limit: '10mb' }));
-app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
-
-const sessions = new Map();
-const userToSessionToken = new Map();
-
-function getSessionUser(req) {
-    const sessionToken = req.cookies?.session_token;
-    if (!sessionToken) return null;
-    
-    const sessionData = sessions.get(sessionToken);
-    if (!sessionData) return null;
-    
-    if (Date.now() > sessionData.expires_at) {
-        sessions.delete(sessionToken);
-        userToSessionToken.delete(sessionData.user.discord_id);
-        return null;
-    }
-    
-    return sessionData.user;
-}
-
-function createSession(res, userData) {
-    const existingToken = userToSessionToken.get(userData.discord_id);
-    if (existingToken) {
-        sessions.delete(existingToken);
-    }
-    
-    const token = uuidv4();
-    const expiresAt = Date.now() + (5 * 60 * 60 * 1000);
-    
-    sessions.set(token, {
-        user: userData,
-        expires_at: expiresAt,
-        created_at: Date.now()
-    });
-    userToSessionToken.set(userData.discord_id, token);
-    
-    res.cookie('session_token', token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        maxAge: 5 * 60 * 60 * 1000,
-        sameSite: 'lax'
-    });
-    return token;
-}
-
-function cleanupExpiredSessions() {
-    const now = Date.now();
-    for (const [token, sessionData] of sessions.entries()) {
-        if (now > sessionData.expires_at) {
-            sessions.delete(token);
-            userToSessionToken.delete(sessionData.user.discord_id);
-        }
-    }
-}
-
-setInterval(cleanupExpiredSessions, 10 * 60 * 1000);
 
 const db = require('./src/utils/database');
 const { SUPPORTED_LANGUAGES, COMMAND_DEFINITIONS, OWNER_ONLY_COMMANDS, PUBLIC_COMMANDS, EMOJI_PERMISSION_COMMANDS } = require('./src/utils/constants');
@@ -90,34 +31,14 @@ const language = require('./src/commands/storage/language');
 const help = require('./src/commands/storage/help');
 
 const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID;
-const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_REPLITT_URI |kT_URI = process.env.REDIRECT REDIRECT_URI = process.env.REDIRECT_URI || 
-    (process.env.REPLIT_DEV_DOMAIN 
-        ? `https://${process.env.REPLIT_DEV_DOMAIN}/auth/discord/callback`
-        : 'http://localhost:3000/auth/discord/callback');
-
-const REDIRECT_URI = process.env.REDIRECT_URI || 
-    (process.env.REPLIT_DEV_DOMAIN 
-        ? `https://${process.env.REPLIT_DEV_DOMAIN}/auth/discord/callback`
-        : 'http://localhost:3000/auth/discord/callback');
+const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET;
+const REDIRECT_URI = process.env.REPLIT_DEV_DOMAIN 
+    ? `https://${process.env.REPLIT_DEV_DOMAIN}/auth/discord/callback`
+    : 'http://localhost:3000/auth/discord/callback';
 
 const WEBSITE_URL = process.env.REPLIT_DEV_DOMAIN 
     ? `https://${process.env.REPLIT_DEV_DOMAIN}`
     : 'http://localhost:3000';
-
-// ✅ أضف هذا هنا
-console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-console.log('🔧 ProEmoji - Environment Configuration');
-console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-console.log('NODE_ENV:', process.env.NODE_ENV || 'development');
-console.log('REPLIT_DEV_DOMAIN:', process.env.REPLIT_DEV_DOMAIN || '❌ Not Set');
-console.log('REDIRECT_URI (from env):', process.env.REDIRECT_URI || '❌ Not Set');
-console.log('REDIRECT_URI (final):', REDIRECT_URI);
-console.log('WEBSITE_URL:', WEBSITE_URL);
-console.log('DISCORD_CLIENT_ID:', DISCORD_CLIENT_ID ? '✅ Set' : '❌ Missing');
-console.log('DISCORD_CLIENT_SECRET:', DISCORD_CLIENT_SECRET ? '✅ Set' : '❌ Missing');
-console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-
-const OWNER_ID = '815701106235670558';
 
 const client = new Client({
     intents: [
@@ -138,6 +59,8 @@ const stickerRenameSessions = new Map();
 const convertedEmojisToStickers = new Map();
 const convertedImagesToStickers = new Map();
 const convertedStickersToEmojis = new Map();
+
+let currentVerifiedUser = null;
 
 async function initializeBot() {
     try {
@@ -518,6 +441,9 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+app.get('/admin', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'admin.html'));
+});
 
 app.get('/api/health', (req, res) => {
     res.json({ status: 'online', bot: 'ProEmoji' });
@@ -533,59 +459,16 @@ app.get('/api/stats', async (req, res) => {
 
 app.get('/api/user-profile', async (req, res) => {
     try {
-        const sessionUser = getSessionUser(req);
-        
-        // ✅ أضف هذا للـ debugging
-        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-        console.log('📊 User Profile Request:');
-        console.log('Session User:', sessionUser ? sessionUser.discord_id : 'None');
-        
-        if (sessionUser) {
-            const isUserAdmin = await db.isAdmin(sessionUser.discord_id);
-            const isUserOwner = await db.isOwner(sessionUser.discord_id);
-            const verifiedUser = await db.getVerifiedUser(sessionUser.discord_id);
-            
-            // ✅ أضف هذا للـ debugging
-            console.log('Verified User:', verifiedUser);
-            console.log('Expires At MS:', verifiedUser?.expires_at_ms);
-            
-            const expiresAt = verifiedUser ? verifiedUser.expires_at_ms : null;
-            
-            // ✅ أضف هذا للـ debugging
-            console.log('Final Expires At:', expiresAt);
-            console.log('Is Expired?', expiresAt ? (Date.now() > expiresAt) : 'N/A');
-            console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        if (currentVerifiedUser) {
+            const isUserAdmin = await db.isAdmin(currentVerifiedUser.discord_id);
+            const verifiedUser = await db.getVerifiedUser(currentVerifiedUser.discord_id);
+            const verifiedAt = verifiedUser ? new Date(verifiedUser.verified_at).getTime() : null;
+            const expiresAt = verifiedAt ? verifiedAt + (5 * 60 * 60 * 1000) : null;
             
             res.json({
-                ...sessionUser,
+                ...currentVerifiedUser,
                 is_admin: isUserAdmin,
-                is_owner: isUserOwner,
-                is_site_owner: sessionUser.discord_id === OWNER_ID,
-                expires_at: expiresAt
-            });
-        } else {
-            res.json({
-                username: 'Guest',
-                avatar: 'https://cdn.discordapp.com/embed/avatars/0.png'
-            });
-        }
-    } catch (error) {
-        console.error('❌ Error in /api/user-profile:', error);
-        res.status(500).json({ error: error.message });
-    }
-});
-        
-        if (sessionUser) {
-            const isUserAdmin = await db.isAdmin(sessionUser.discord_id);
-            const isUserOwner = await db.isOwner(sessionUser.discord_id);
-            const verifiedUser = await db.getVerifiedUser(sessionUser.discord_id);
-            const expiresAt = verifiedUser ? verifiedUser.expires_at_ms : null;
-            
-            res.json({
-                ...sessionUser,
-                is_admin: isUserAdmin,
-                is_owner: isUserOwner,
-                is_site_owner: sessionUser.discord_id === OWNER_ID,
+                verified_at: verifiedAt,
                 expires_at: expiresAt
             });
         } else {
@@ -616,24 +499,8 @@ app.get('/auth/discord', (req, res) => {
 
 app.get('/auth/discord/callback', async (req, res) => {
     const code = req.query.code;
-    const error = req.query.error;
-    
-    // ✅ أضف هذا في البداية
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('🔐 OAuth Callback Triggered:');
-    console.log('Code:', code ? '✅ Present' : '❌ Missing');
-    console.log('Error:', error || 'None');
-    console.log('REDIRECT_URI:', REDIRECT_URI);
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    
-    // إذا المستخدم رفض الـ authorization
-    if (error === 'access_denied') {
-        console.log('❌ User denied authorization');
-        return res.redirect('/#activation?error=access_denied');
-    }
     
     if (!code) {
-        console.log('❌ No authorization code received');
         return res.redirect('/#activation?error=no_code');
     }
     
@@ -652,97 +519,10 @@ app.get('/auth/discord/callback', async (req, res) => {
         
         const tokenData = await tokenResponse.json();
         
-        // ✅ أضف هذا بعد token response
-        if (!tokenResponse.ok) {
-            console.error('❌ Token Exchange Failed:');
-            console.error('Status:', tokenResponse.status);
-            console.error('Response:', tokenData);
-            console.error('REDIRECT_URI used:', REDIRECT_URI);
+        if (!tokenData.access_token) {
             return res.redirect('/#activation?error=token_failed');
         }
         
-        console.log('✅ Token received successfully');
-        
-        const userResponse = await fetch('https://discord.com/api/users/@me', {
-            headers: { Authorization: `Bearer ${tokenData.access_token}` }
-        });
-        
-        const userData = await userResponse.json();
-        
-        console.log('✅ User Data Retrieved:');
-        console.log('Username:', userData.username);
-        console.log('Discord ID:', userData.id);
-        
-        if (!userData.id) {
-            console.error('❌ No user ID in response');
-            return res.redirect('/#activation?error=user_failed');
-        }
-        
-        const avatarUrl = userData.avatar 
-            ? `https://cdn.discordapp.com/avatars/${userData.id}/${userData.avatar}.png`
-            : 'https://cdn.discordapp.com/embed/avatars/0.png';
-        
-        const expiresAt = await db.verifyUserDb(userData.id, userData.username, avatarUrl);
-        
-        console.log('✅ User Verified in Database:');
-        console.log('Discord ID:', userData.id);
-        console.log('Expires At (timestamp):', expiresAt);
-        console.log('Expires At (date):', new Date(expiresAt));
-        console.log('Current Time:', new Date());
-        
-        const sessionUserData = {
-            discord_id: userData.id,
-            username: userData.username,
-            avatar: avatarUrl
-        };
-        
-        createSession(res, sessionUserData);
-        
-        console.log('✅ Session Created Successfully');
-        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-        
-        res.redirect(`/#activation?verified=true&expires=${expiresAt}`);
-    } catch (error) {
-        console.error('❌ OAuth2 Error:', error.message);
-        console.error('Stack:', error.stack);
-        res.redirect('/#activation?error=oauth_failed');
-    }
-});
-    
-    // إذا المستخدم رفض الـ authorization
-    if (error === 'access_denied') {
-        console.log('❌ User denied authorization');
-        return res.redirect('/#activation?error=access_denied');
-    }
-    
-    if (!code) {
-        console.log('❌ No authorization code received');
-        return res.redirect('/#activation?error=no_code');
-    }
-    
-    try {
-    const tokenResponse = await fetch('https://discord.com/api/oauth2/token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({
-            client_id: DISCORD_CLIENT_ID,
-            client_secret: DISCORD_CLIENT_SECRET,
-            grant_type: 'authorization_code',
-            code: code,
-            redirect_uri: REDIRECT_URI  // ✅ تأكد أن هذا صحيح
-        })
-    });
-    
-    const tokenData = await tokenResponse.json();
-    
-    // ✅ أضف هذا للـ debugging
-    if (!tokenResponse.ok) {
-        console.error('❌ Token exchange failed:', tokenData);
-        console.error('Status:', tokenResponse.status);
-        console.error('Redirect URI used:', REDIRECT_URI);
-        return res.redirect('/#activation?error=token_failed');
-    }
-        
         const userResponse = await fetch('https://discord.com/api/users/@me', {
             headers: { Authorization: `Bearer ${tokenData.access_token}` }
         });
@@ -757,19 +537,17 @@ app.get('/auth/discord/callback', async (req, res) => {
             ? `https://cdn.discordapp.com/avatars/${userData.id}/${userData.avatar}.png`
             : 'https://cdn.discordapp.com/embed/avatars/0.png';
         
-        const expiresAt = await db.verifyUserDb(userData.id, userData.username, avatarUrl);
+        await db.verifyUserDb(userData.id, userData.username, avatarUrl);
         
-        const sessionUserData = {
+        currentVerifiedUser = {
             discord_id: userData.id,
             username: userData.username,
             avatar: avatarUrl
         };
-        
-        createSession(res, sessionUserData);
         
         console.log(`✅ User verified: ${userData.username} (${userData.id})`);
         
-        res.redirect(`/#activation?verified=true&expires=${expiresAt}`);
+        res.redirect('/#home');
     } catch (error) {
         console.error('OAuth2 error:', error);
         res.redirect('/#activation?error=oauth_failed');
@@ -787,16 +565,15 @@ app.get('/api/suggestions', async (req, res) => {
 
 app.post('/api/suggestions', async (req, res) => {
     try {
-        const sessionUser = getSessionUser(req);
-        if (!sessionUser) {
+        if (!currentVerifiedUser) {
             return res.status(401).json({ error: 'Not verified' });
         }
         
         const { title, description } = req.body;
         const suggestion = await db.createSuggestion(
-            sessionUser.discord_id,
-            sessionUser.username,
-            sessionUser.avatar,
+            currentVerifiedUser.discord_id,
+            currentVerifiedUser.username,
+            currentVerifiedUser.avatar,
             title,
             description
         );
@@ -808,15 +585,14 @@ app.post('/api/suggestions', async (req, res) => {
 
 app.delete('/api/suggestions/:id', async (req, res) => {
     try {
-        const sessionUser = getSessionUser(req);
-        if (!sessionUser) {
+        if (!currentVerifiedUser) {
             return res.status(401).json({ error: 'Not verified' });
         }
         
         const suggestion = await db.getSuggestionById(req.params.id);
-        const isUserAdmin = await db.isAdmin(sessionUser.discord_id);
+        const isUserAdmin = await db.isAdmin(currentVerifiedUser.discord_id);
         
-        if (suggestion.discord_id !== sessionUser.discord_id && !isUserAdmin) {
+        if (suggestion.discord_id !== currentVerifiedUser.discord_id && !isUserAdmin) {
             return res.status(403).json({ error: 'Not authorized' });
         }
         
@@ -829,13 +605,12 @@ app.delete('/api/suggestions/:id', async (req, res) => {
 
 app.post('/api/suggestions/:id/like', async (req, res) => {
     try {
-        const sessionUser = getSessionUser(req);
-        if (!sessionUser) {
+        if (!currentVerifiedUser) {
             return res.status(401).json({ error: 'Not verified' });
         }
         
         const { is_like } = req.body;
-        await db.toggleLike(sessionUser.discord_id, 'suggestion', req.params.id, is_like);
+        await db.toggleLike(currentVerifiedUser.discord_id, 'suggestion', req.params.id, is_like);
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -853,16 +628,15 @@ app.get('/api/suggestions/:id/comments', async (req, res) => {
 
 app.post('/api/suggestions/:id/comments', async (req, res) => {
     try {
-        const sessionUser = getSessionUser(req);
-        if (!sessionUser) {
+        if (!currentVerifiedUser) {
             return res.status(401).json({ error: 'Not verified' });
         }
         
         const { content } = req.body;
         const comment = await db.addComment(
-            sessionUser.discord_id,
-            sessionUser.username,
-            sessionUser.avatar,
+            currentVerifiedUser.discord_id,
+            currentVerifiedUser.username,
+            currentVerifiedUser.avatar,
             'suggestion',
             req.params.id,
             content
@@ -884,16 +658,15 @@ app.get('/api/reports', async (req, res) => {
 
 app.post('/api/reports', async (req, res) => {
     try {
-        const sessionUser = getSessionUser(req);
-        if (!sessionUser) {
+        if (!currentVerifiedUser) {
             return res.status(401).json({ error: 'Not verified' });
         }
         
         const { title, description, image_url } = req.body;
         const report = await db.createReport(
-            sessionUser.discord_id,
-            sessionUser.username,
-            sessionUser.avatar,
+            currentVerifiedUser.discord_id,
+            currentVerifiedUser.username,
+            currentVerifiedUser.avatar,
             title,
             description,
             image_url
@@ -906,15 +679,14 @@ app.post('/api/reports', async (req, res) => {
 
 app.delete('/api/reports/:id', async (req, res) => {
     try {
-        const sessionUser = getSessionUser(req);
-        if (!sessionUser) {
+        if (!currentVerifiedUser) {
             return res.status(401).json({ error: 'Not verified' });
         }
         
         const report = await db.getReportById(req.params.id);
-        const isUserAdmin = await db.isAdmin(sessionUser.discord_id);
+        const isUserAdmin = await db.isAdmin(currentVerifiedUser.discord_id);
         
-        if (report.discord_id !== sessionUser.discord_id && !isUserAdmin) {
+        if (report.discord_id !== currentVerifiedUser.discord_id && !isUserAdmin) {
             return res.status(403).json({ error: 'Not authorized' });
         }
         
@@ -927,13 +699,12 @@ app.delete('/api/reports/:id', async (req, res) => {
 
 app.post('/api/reports/:id/like', async (req, res) => {
     try {
-        const sessionUser = getSessionUser(req);
-        if (!sessionUser) {
+        if (!currentVerifiedUser) {
             return res.status(401).json({ error: 'Not verified' });
         }
         
         const { is_like } = req.body;
-        await db.toggleLike(sessionUser.discord_id, 'report', req.params.id, is_like);
+        await db.toggleLike(currentVerifiedUser.discord_id, 'report', req.params.id, is_like);
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -951,16 +722,15 @@ app.get('/api/reports/:id/comments', async (req, res) => {
 
 app.post('/api/reports/:id/comments', async (req, res) => {
     try {
-        const sessionUser = getSessionUser(req);
-        if (!sessionUser) {
+        if (!currentVerifiedUser) {
             return res.status(401).json({ error: 'Not verified' });
         }
         
         const { content } = req.body;
         const comment = await db.addComment(
-            sessionUser.discord_id,
-            sessionUser.username,
-            sessionUser.avatar,
+            currentVerifiedUser.discord_id,
+            currentVerifiedUser.username,
+            currentVerifiedUser.avatar,
             'report',
             req.params.id,
             content
@@ -973,13 +743,12 @@ app.post('/api/reports/:id/comments', async (req, res) => {
 
 app.delete('/api/comments/:id', async (req, res) => {
     try {
-        const sessionUser = getSessionUser(req);
-        if (!sessionUser) {
+        if (!currentVerifiedUser) {
             return res.status(401).json({ error: 'Not verified' });
         }
         
-        const isUserAdmin = await db.isAdmin(sessionUser.discord_id);
-        await db.deleteComment(req.params.id, sessionUser.discord_id, isUserAdmin);
+        const isUserAdmin = await db.isAdmin(currentVerifiedUser.discord_id);
+        await db.deleteComment(req.params.id, currentVerifiedUser.discord_id, isUserAdmin);
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -997,14 +766,12 @@ app.get('/api/admins', async (req, res) => {
 
 app.post('/api/admins', async (req, res) => {
     try {
-        const sessionUser = getSessionUser(req);
-        if (!sessionUser) {
+        if (!currentVerifiedUser) {
             return res.status(401).json({ error: 'Not verified' });
         }
         
-        const isUserOwner = await db.isOwner(sessionUser.discord_id);
-        const isSiteOwner = sessionUser.discord_id === OWNER_ID;
-        if (!isUserOwner && !isSiteOwner) {
+        const isUserOwner = await db.isOwner(currentVerifiedUser.discord_id);
+        if (!isUserOwner) {
             return res.status(403).json({ error: 'Only the owner can add admins' });
         }
         
@@ -1018,14 +785,12 @@ app.post('/api/admins', async (req, res) => {
 
 app.delete('/api/admins/:discord_id', async (req, res) => {
     try {
-        const sessionUser = getSessionUser(req);
-        if (!sessionUser) {
+        if (!currentVerifiedUser) {
             return res.status(401).json({ error: 'Not verified' });
         }
         
-        const isUserOwner = await db.isOwner(sessionUser.discord_id);
-        const isSiteOwner = sessionUser.discord_id === OWNER_ID;
-        if (!isUserOwner && !isSiteOwner) {
+        const isUserOwner = await db.isOwner(currentVerifiedUser.discord_id);
+        if (!isUserOwner) {
             return res.status(403).json({ error: 'Only the owner can remove admins' });
         }
         
@@ -1038,8 +803,7 @@ app.delete('/api/admins/:discord_id', async (req, res) => {
 
 app.post('/api/set-owner', async (req, res) => {
     try {
-        const sessionUser = getSessionUser(req);
-        if (!sessionUser) {
+        if (!currentVerifiedUser) {
             return res.status(401).json({ error: 'Not verified' });
         }
         
@@ -1051,9 +815,9 @@ app.post('/api/set-owner', async (req, res) => {
         }
         
         await db.addAdmin(
-            sessionUser.discord_id,
-            sessionUser.username,
-            sessionUser.avatar,
+            currentVerifiedUser.discord_id,
+            currentVerifiedUser.username,
+            currentVerifiedUser.avatar,
             true
         );
         

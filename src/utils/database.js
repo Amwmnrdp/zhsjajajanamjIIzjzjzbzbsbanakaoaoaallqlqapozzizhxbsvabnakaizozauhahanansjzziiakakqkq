@@ -73,8 +73,7 @@ async function initDatabase() {
                 discord_id VARCHAR(255) UNIQUE NOT NULL,
                 discord_username VARCHAR(255),
                 discord_avatar VARCHAR(512),
-                verified_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                expires_at TIMESTAMP DEFAULT (CURRENT_TIMESTAMP + INTERVAL '5 hours')
+                verified_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
 
             CREATE TABLE IF NOT EXISTS emojis_added (
@@ -293,34 +292,23 @@ async function deleteComment(id, discordId, isAdmin) {
 }
 
 async function verifyUserDb(discordId, username, avatar) {
-    const expiresAt = new Date(Date.now() + 5 * 60 * 60 * 1000);
     await pool.query(
-        'INSERT INTO verified_users (discord_id, discord_username, discord_avatar, verified_at, expires_at) VALUES ($1, $2, $3, CURRENT_TIMESTAMP, $4) ON CONFLICT (discord_id) DO UPDATE SET discord_username = $2, discord_avatar = $3, verified_at = CURRENT_TIMESTAMP, expires_at = $4',
-        [discordId, username, avatar, expiresAt]
+        'INSERT INTO verified_users (discord_id, discord_username, discord_avatar, verified_at) VALUES ($1, $2, $3, CURRENT_TIMESTAMP) ON CONFLICT (discord_id) DO UPDATE SET discord_username = $2, discord_avatar = $3, verified_at = CURRENT_TIMESTAMP',
+        [discordId, username, avatar]
     );
-    return expiresAt.getTime();
 }
 
 async function isUserVerifiedDb(discordId) {
     const result = await pool.query(
-        "SELECT * FROM verified_users WHERE discord_id = $1 AND expires_at > NOW()",
+        "SELECT * FROM verified_users WHERE discord_id = $1 AND verified_at > NOW() - INTERVAL '5 hours'",
         [discordId]
     );
     return result.rows.length > 0;
 }
 
 async function getVerifiedUser(discordId) {
-    const result = await pool.query('SELECT *, EXTRACT(EPOCH FROM expires_at) * 1000 as expires_at_ms FROM verified_users WHERE discord_id = $1', [discordId]);
+    const result = await pool.query('SELECT * FROM verified_users WHERE discord_id = $1', [discordId]);
     return result.rows[0];
-}
-
-async function getVerificationExpiry(discordId) {
-    const result = await pool.query(
-        "SELECT EXTRACT(EPOCH FROM expires_at) * 1000 as expires_at_ms FROM verified_users WHERE discord_id = $1",
-        [discordId]
-    );
-    if (result.rows.length === 0) return null;
-    return result.rows[0].expires_at_ms;
 }
 
 async function resetAllVerificationsDb() {
@@ -380,7 +368,6 @@ module.exports = {
     verifyUserDb,
     isUserVerifiedDb,
     getVerifiedUser,
-    getVerificationExpiry,
     resetAllVerificationsDb,
     getVerifiedUsersCountDb,
     addEmojiRecord,

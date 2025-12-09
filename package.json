@@ -12,12 +12,10 @@
   "dependencies": {
     "@discordjs/rest": "^2.4.3",
     "@types/node": "^18.0.6",
-    "cookie-parser": "^1.4.7",
     "discord.js": "^14.18.0",
     "express": "^4.21.2",
     "google-translate-api-x": "^10.7.2",
     "is-image-url": "^1.1.8",
-    "pg": "^8.16.3",
-    "uuid": "^13.0.0"
+    "pg": "^8.16.3"
   }
 }
