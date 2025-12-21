@@ -565,24 +565,13 @@ h2 {
 
 @keyframes sandFall {
     0% {
-        transform: translateY(-10px) rotateZ(0deg);
-        opacity: 1;
-    }
-    25% {
-        transform: translateY(5px) rotateZ(180deg);
-        opacity: 1;
+        transform: rotateZ(-15deg);
     }
     50% {
-        transform: translateY(5px) rotateZ(180deg);
-        opacity: 1;
-    }
-    75% {
-        transform: translateY(-5px) rotateZ(360deg);
-        opacity: 1;
+        transform: rotateZ(15deg);
     }
     100% {
-        transform: translateY(-10px) rotateZ(360deg);
-        opacity: 1;
+        transform: rotateZ(-15deg);
     }
 }
 
