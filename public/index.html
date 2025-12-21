@@ -125,17 +125,15 @@
                     </a>
                     <p class="verification-note">You will be redirected to Discord to authorize your account</p>
                 </div>
-                <div class="activation-main-card verified-card" id="verifiedCard" style="display: none;">
-                    <div class="activation-icon verified-icon">✅</div>
-                    <h3>Account Verified!</h3>
-                    <p>Your Discord account is verified. You can now use all ProEmoji commands.</p>
-                    <div class="timer-container">
-                        <div class="timer-label">Time until re-verification:</div>
+                <div class="verified-circle" id="verifiedCard" style="display: none;">
+                    <div class="hourglass-emoji">⏳</div>
+                    <div class="circle-content">
                         <div class="timer-display" id="verificationTimer">
                             <span id="timerHours">00</span>:<span id="timerMinutes">00</span>:<span id="timerSeconds">00</span>
                         </div>
+                        <p class="circle-timer-label">Account Verified!</p>
+                        <p class="circle-reactivation-text">Reactivation is possible after 5 hours</p>
                     </div>
-                    <p class="verification-note">You will need to verify again when the timer expires</p>
                 </div>
             </div>
         </section>

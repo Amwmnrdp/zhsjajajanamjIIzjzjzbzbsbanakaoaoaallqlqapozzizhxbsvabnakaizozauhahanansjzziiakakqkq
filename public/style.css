@@ -542,19 +542,70 @@ h2 {
     margin-top: 20px;
 }
 
-.verified-card {
-    border-color: rgba(16, 185, 129, 0.3);
-    background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(5, 150, 105, 0.15) 100%);
-    box-shadow: 0 20px 60px rgba(16, 185, 129, 0.2);
+.verified-circle {
+    position: relative;
+    width: 300px;
+    height: 300px;
+    border-radius: 50%;
+    border: 4px solid #FCD34D;
+    background: radial-gradient(circle, rgba(252, 211, 77, 0.1) 0%, rgba(16, 185, 129, 0.05) 100%);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    box-shadow: 0 0 40px rgba(252, 211, 77, 0.4), inset 0 0 40px rgba(252, 211, 77, 0.1);
 }
 
-.verified-icon {
-    animation: pulse-glow 2s ease-in-out infinite;
+.hourglass-emoji {
+    position: absolute;
+    top: -40px;
+    font-size: 3em;
+    animation: sandFall 2s ease-in-out infinite;
 }
 
-@keyframes pulse-glow {
-    0%, 100% { transform: scale(1); }
-    50% { transform: scale(1.05); }
+@keyframes sandFall {
+    0% {
+        transform: translateY(-10px) rotateZ(0deg);
+        opacity: 1;
+    }
+    25% {
+        transform: translateY(5px) rotateZ(180deg);
+        opacity: 1;
+    }
+    50% {
+        transform: translateY(5px) rotateZ(180deg);
+        opacity: 1;
+    }
+    75% {
+        transform: translateY(-5px) rotateZ(360deg);
+        opacity: 1;
+    }
+    100% {
+        transform: translateY(-10px) rotateZ(360deg);
+        opacity: 1;
+    }
+}
+
+.circle-content {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.circle-timer-label {
+    color: #10b981;
+    font-size: 0.95em;
+    font-weight: 600;
+    margin: 0;
+}
+
+.circle-reactivation-text {
+    color: #FCD34D;
+    font-size: 0.85em;
+    margin: 0;
 }
 
 .timer-container {
@@ -571,11 +622,11 @@ h2 {
 }
 
 .timer-display {
-    font-size: 2.5em;
+    font-size: 2em;
     font-weight: 700;
     font-family: 'Courier New', monospace;
-    color: #10b981;
-    text-shadow: 0 0 20px rgba(16, 185, 129, 0.5);
+    color: #FCD34D;
+    text-shadow: 0 0 20px rgba(252, 211, 77, 0.6);
 }
 
 .timer-display span {
