@@ -43,7 +43,7 @@ async function initDatabase() {
                 discord_avatar VARCHAR(512),
                 title VARCHAR(255),
                 description TEXT,
-                image_url VARCHAR(1024),
+                image_url TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
 

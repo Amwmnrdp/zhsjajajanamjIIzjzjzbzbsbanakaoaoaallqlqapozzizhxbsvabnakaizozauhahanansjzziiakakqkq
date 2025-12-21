@@ -1109,6 +1109,125 @@ h2 {
     padding: 30px;
 }
 
+/* Bot Avatar Styling */
+.bot-image-container {
+    display: flex;
+    justify-content: center;
+    margin: 30px 0;
+    perspective: 1000px;
+}
+
+.bot-avatar-large {
+    width: 150px;
+    height: 150px;
+    border-radius: 50%;
+    border: 3px solid #667eea;
+    box-shadow: 0 0 30px rgba(102, 126, 234, 0.5), 0 0 60px rgba(102, 126, 234, 0.3);
+    animation: pulseGlow 2s ease-in-out infinite, float 3s ease-in-out infinite;
+    object-fit: cover;
+}
+
+@keyframes pulseGlow {
+    0%, 100% { box-shadow: 0 0 30px rgba(102, 126, 234, 0.5), 0 0 60px rgba(102, 126, 234, 0.3); }
+    50% { box-shadow: 0 0 40px rgba(102, 126, 234, 0.8), 0 0 80px rgba(102, 126, 234, 0.5); }
+}
+
+@keyframes float {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-10px); }
+}
+
+.bot-image-upload-container {
+    display: flex;
+    justify-content: center;
+    margin: 20px 0 30px;
+    perspective: 1000px;
+}
+
+.bot-avatar-modal {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    border: 2px solid #667eea;
+    box-shadow: 0 0 20px rgba(102, 126, 234, 0.4);
+    animation: pulseGlow 2s ease-in-out infinite, float 3s ease-in-out infinite;
+    object-fit: cover;
+}
+
+/* Support Section */
+.support-card {
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
+    border: 1px solid rgba(102, 126, 234, 0.3);
+    border-radius: 15px;
+    padding: 40px;
+    margin: 30px 0;
+    backdrop-filter: blur(10px);
+    transition: all 0.3s ease;
+}
+
+.support-card:hover {
+    border-color: rgba(102, 126, 234, 0.6);
+    box-shadow: 0 8px 32px rgba(102, 126, 234, 0.2);
+}
+
+.support-content h3 {
+    color: #667eea;
+    margin-bottom: 15px;
+    font-size: 1.4em;
+}
+
+.support-content p {
+    color: #b0b0b0;
+    margin-bottom: 20px;
+    line-height: 1.6;
+}
+
+.support-benefits {
+    list-style: none;
+    margin: 20px 0;
+    padding: 0;
+}
+
+.support-benefits li {
+    padding: 10px 0 10px 30px;
+    position: relative;
+    color: #b0b0b0;
+}
+
+.support-benefits li:before {
+    content: "✓";
+    position: absolute;
+    left: 0;
+    color: #667eea;
+    font-weight: bold;
+}
+
+.btn-discord-join {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    background: linear-gradient(135deg, #5865F2, #4752C4);
+    color: white;
+    padding: 12px 30px;
+    border: none;
+    border-radius: 25px;
+    font-size: 1em;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-decoration: none;
+    margin-top: 20px;
+}
+
+.btn-discord-join:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px rgba(88, 101, 242, 0.3);
+}
+
+.btn-discord-join:active {
+    transform: translateY(0);
+}
+
 /* Empty State */
 .empty-state {
     text-align: center;

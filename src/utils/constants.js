@@ -196,6 +196,18 @@ const COMMAND_DEFINITIONS = [
         description: 'List all server stickers'
     },
     {
+        name: 'add_sticker',
+        description: 'Add a sticker to server',
+        options: [
+            {
+                name: 'name',
+                type: 3,
+                description: 'Custom sticker name (optional)',
+                required: false
+            }
+        ]
+    },
+    {
         name: 'ping',
         description: 'Check bot response speed'
     }
@@ -206,7 +218,7 @@ const PUBLIC_COMMANDS = ['ping', 'help'];
 const EMOJI_PERMISSION_COMMANDS = [
     'add_emoji', 'delete_emoji', 'rename_emoji', 'image_to_emoji', 
     'emoji_to_sticker', 'sticker_to_emoji', 'emoji_search', 'suggest_emojis',
-    'list_emojis', 'delete_sticker', 'rename_sticker', 'image_to_sticker', 'list_stickers'
+    'list_emojis', 'delete_sticker', 'rename_sticker', 'image_to_sticker', 'list_stickers', 'add_sticker'
 ];
 
 module.exports = {

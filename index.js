@@ -19,6 +19,7 @@ const imagetoemoji = require('./src/commands/emoji/imagetoemoji');
 const emojiTosticker = require('./src/commands/emoji/emojiTosticker');
 const suggestemojis = require('./src/commands/emoji/suggestemojis');
 
+const addsticker = require('./src/commands/sticker/addsticker');
 const deletesticker = require('./src/commands/sticker/deletesticker');
 const renamesticker = require('./src/commands/sticker/renamesticker');
 const stickertoemi = require('./src/commands/sticker/stickertoemi');
@@ -56,6 +57,7 @@ const usedUrls = {};
 const stickerDeletionSessions = new Map();
 const stickerToEmojiSessions = new Map();
 const stickerRenameSessions = new Map();
+const stickerAddSessions = new Map();
 const convertedEmojisToStickers = new Map();
 const convertedImagesToStickers = new Map();
 const convertedStickersToEmojis = new Map();
@@ -250,6 +252,19 @@ client.on('interactionCreate', async interaction => {
         }
         else if (interaction.commandName === 'image_to_sticker') await imagetosticker.execute(interaction, langCode, convertedImagesToStickers);
         else if (interaction.commandName === 'list_stickers') await liststicker.execute(interaction, langCode);
+        else if (interaction.commandName === 'add_sticker') {
+            const msg = await addsticker.execute(interaction, langCode);
+            const customName = interaction.options.getString('name');
+            stickerAddSessions.set(msg.id, {
+                guildId: interaction.guild.id,
+                userId: interaction.user.id,
+                langCode: langCode,
+                messageId: msg.id,
+                channelId: msg.channel.id,
+                customName: customName
+            });
+            setTimeout(() => stickerAddSessions.has(msg.id) && stickerAddSessions.delete(msg.id), 60000);
+        }
     } catch (error) {
         console.error('⚠️ Interaction error:', error.message);
     }
@@ -395,6 +410,55 @@ client.on('messageCreate', async message => {
             }
         }
 
+        const addSession = stickerAddSessions.get(repliedTo?.id);
+        if (addSession && addSession.userId === message.author.id && addSession.guildId === message.guild.id) {
+            const sessionLang = addSession.langCode || 'en';
+            const sticker = message.stickers.first();
+            const stickerName = addSession.customName || sticker.name;
+            const serverStickers = message.guild.stickers.cache;
+            const duplicateByName = serverStickers.find(s => s.name.toLowerCase() === stickerName.toLowerCase());
+
+            if (duplicateByName) {
+                const embed = new EmbedBuilder()
+                    .setTitle('⚠️ ' + await t('Sticker Name Already Exists!', sessionLang))
+                    .setDescription(await t('A sticker with this name already exists!', sessionLang))
+                    .setColor('#FF9900');
+                await message.reply({ embeds: [embed] });
+                stickerAddSessions.delete(repliedTo.id);
+                return;
+            }
+
+            try {
+                const newSticker = await message.guild.stickers.create({
+                    file: sticker.url,
+                    name: stickerName,
+                    description: await t('Added by', sessionLang) + ` ${message.author.username}`,
+                    reason: `Added by ${message.author.tag}`
+                });
+
+                const embed = new EmbedBuilder()
+                    .setTitle('✅ ' + await t('Sticker Added!', sessionLang))
+                    .setDescription(await t('Successfully added sticker to server!', sessionLang) + `\n\n**${await t('Sticker Name:', sessionLang)}** ${stickerName}`)
+                    .setColor('#00FF00')
+                    .setFooter({ text: await t('You can now use this sticker in your server!', sessionLang) });
+                await message.reply({ embeds: [embed] });
+                stickerAddSessions.delete(repliedTo.id);
+            } catch (error) {
+                const errorMsg = error.code === 50045 ?
+                    await t('Sticker URL is invalid or unavailable', sessionLang) :
+                    error.code === 50138 ?
+                    await t('File must be under 512KB', sessionLang) :
+                    error.code === 50013 ?
+                    await t('Missing permissions to create sticker', sessionLang) :
+                    await t('Error:', sessionLang) + ' ' + error.message;
+                const embed = new EmbedBuilder()
+                    .setDescription(`❌ ${errorMsg}`)
+                    .setColor('#FF0000');
+                await message.reply({ embeds: [embed] });
+                console.error(`⚠️ Discord Error in add_sticker:`, error.code, error.message);
+            }
+        }
+
         const renameSession = stickerRenameSessions.get(repliedTo?.id);
         if (renameSession && renameSession.userId === message.author.id && renameSession.guildId === message.guild.id) {
             const sessionLang = renameSession.langCode || 'en';
@@ -491,7 +555,7 @@ app.get('/auth/discord', (req, res) => {
         client_id: DISCORD_CLIENT_ID,
         redirect_uri: REDIRECT_URI,
         response_type: 'code',
-        scope: 'identify'
+        scope: 'identify email'
     });
     
     res.redirect(`https://discord.com/api/oauth2/authorize?${params.toString()}`);
