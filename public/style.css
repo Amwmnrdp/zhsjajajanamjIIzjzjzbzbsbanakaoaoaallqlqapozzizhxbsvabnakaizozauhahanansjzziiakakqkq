@@ -129,19 +129,30 @@ body.menu-open {
 }
 
 .user-role-icon {
-    font-size: 1.1em;
-    display: inline-flex;
+    display: flex;
     align-items: center;
     justify-content: center;
-    animation: roleIconGlow 2s ease-in-out infinite;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: rgba(102, 126, 234, 0.15);
+    border: 1px solid rgba(102, 126, 234, 0.3);
+    animation: roleIconPulse 2s ease-in-out infinite;
 }
 
-@keyframes roleIconGlow {
+.user-role-icon i {
+    font-size: 0.95em;
+    color: #667eea;
+}
+
+@keyframes roleIconPulse {
     0%, 100% {
-        filter: drop-shadow(0 0 2px rgba(102, 126, 234, 0.4));
+        background: rgba(102, 126, 234, 0.15);
+        box-shadow: 0 0 8px rgba(102, 126, 234, 0.2);
     }
     50% {
-        filter: drop-shadow(0 0 8px rgba(102, 126, 234, 0.8));
+        background: rgba(102, 126, 234, 0.25);
+        box-shadow: 0 0 16px rgba(102, 126, 234, 0.4);
     }
 }
 

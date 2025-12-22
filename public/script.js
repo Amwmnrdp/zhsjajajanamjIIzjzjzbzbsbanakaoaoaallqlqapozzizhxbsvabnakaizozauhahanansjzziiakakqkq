@@ -162,14 +162,14 @@ async function fetchUserProfile() {
         // Update role icon based on user status
         if (currentUser && currentUser.discord_id) {
             if (isOwner) {
-                roleIconEl.textContent = '👑';
+                roleIconEl.innerHTML = '<i class="fas fa-crown"></i>';
             } else if (isAdmin) {
-                roleIconEl.textContent = '⚙️';
+                roleIconEl.innerHTML = '<i class="fas fa-cog"></i>';
             } else {
-                roleIconEl.textContent = '👤';
+                roleIconEl.innerHTML = '<i class="fas fa-user-circle"></i>';
             }
         } else {
-            roleIconEl.textContent = '';
+            roleIconEl.innerHTML = '';
         }
         
         if (adminPanelLink && isAdmin) {
@@ -191,7 +191,7 @@ async function fetchUserProfile() {
         console.error('Error fetching user profile:', error);
         document.getElementById('userAvatar').src = 'https://cdn.discordapp.com/embed/avatars/0.png';
         document.getElementById('userName').textContent = 'Guest';
-        document.getElementById('userRoleIcon').textContent = '';
+        document.getElementById('userRoleIcon').innerHTML = '';
     }
 }
 
