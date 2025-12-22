@@ -28,9 +28,11 @@ const removeImageBtn = document.getElementById('removeImage');
 
 let currentUser = null;
 let isAdmin = false;
+let isOwner = false;
 let uploadedImageData = null;
 let timerInterval = null;
 let verificationExpiresAt = null;
+let allAdmins = [];
 
 let scrollPosition = 0;
 
@@ -129,6 +131,7 @@ async function fetchUserProfile() {
         
         const avatarEl = document.getElementById('userAvatar');
         const nameEl = document.getElementById('userName');
+        const roleIconEl = document.getElementById('userRoleIcon');
         const adminPanelLink = document.getElementById('adminPanelLink');
         const activationCard = document.getElementById('activationCard');
         const verifiedCard = document.getElementById('verifiedCard');
@@ -140,6 +143,34 @@ async function fetchUserProfile() {
             avatarEl.src = 'https://cdn.discordapp.com/embed/avatars/0.png';
         }
         nameEl.textContent = data.username || 'Guest';
+        
+        // Fetch admin list to determine user's role
+        try {
+            const adminsResponse = await fetch('/api/admins');
+            const admins = await adminsResponse.json();
+            allAdmins = admins;
+            
+            if (currentUser && currentUser.discord_id) {
+                const owner = admins.find(a => a.is_owner);
+                isOwner = owner && owner.discord_id === currentUser.discord_id;
+                isAdmin = admins.some(a => a.discord_id === currentUser.discord_id);
+            }
+        } catch (error) {
+            console.error('Error fetching admins:', error);
+        }
+        
+        // Update role icon based on user status
+        if (currentUser && currentUser.discord_id) {
+            if (isOwner) {
+                roleIconEl.textContent = '👑';
+            } else if (isAdmin) {
+                roleIconEl.textContent = '⚙️';
+            } else {
+                roleIconEl.textContent = '👤';
+            }
+        } else {
+            roleIconEl.textContent = '';
+        }
         
         if (adminPanelLink && isAdmin) {
             adminPanelLink.style.display = 'block';
@@ -160,6 +191,7 @@ async function fetchUserProfile() {
         console.error('Error fetching user profile:', error);
         document.getElementById('userAvatar').src = 'https://cdn.discordapp.com/embed/avatars/0.png';
         document.getElementById('userName').textContent = 'Guest';
+        document.getElementById('userRoleIcon').textContent = '';
     }
 }
 

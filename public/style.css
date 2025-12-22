@@ -113,12 +113,36 @@ body.menu-open {
     object-fit: cover;
 }
 
+.user-name-container {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
 .user-name {
     color: #e0e0e0;
     font-weight: 600;
     font-size: 0.9em;
     word-break: break-word;
     flex: 1;
+}
+
+.user-role-icon {
+    font-size: 1.1em;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    animation: roleIconGlow 2s ease-in-out infinite;
+}
+
+@keyframes roleIconGlow {
+    0%, 100% {
+        filter: drop-shadow(0 0 2px rgba(102, 126, 234, 0.4));
+    }
+    50% {
+        filter: drop-shadow(0 0 8px rgba(102, 126, 234, 0.8));
+    }
 }
 
 .sidebar.active {
