@@ -865,6 +865,33 @@ app.delete('/api/admins/:discord_id', async (req, res) => {
     }
 });
 
+app.get('/api/verify-discord-id/:discord_id', async (req, res) => {
+    try {
+        const { discord_id } = req.params;
+        
+        if (!/^\d+$/.test(discord_id)) {
+            return res.status(400).json({ error: 'Invalid Discord ID format' });
+        }
+        
+        try {
+            const user = await client.users.fetch(discord_id);
+            if (!user) {
+                return res.status(404).json({ error: 'Discord user not found' });
+            }
+            
+            res.json({
+                discord_id: user.id,
+                username: user.username,
+                avatar: user.displayAvatarURL()
+            });
+        } catch (discordError) {
+            return res.status(404).json({ error: 'Discord user not found' });
+        }
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 app.post('/api/set-owner', async (req, res) => {
     try {
         if (!currentVerifiedUser) {
