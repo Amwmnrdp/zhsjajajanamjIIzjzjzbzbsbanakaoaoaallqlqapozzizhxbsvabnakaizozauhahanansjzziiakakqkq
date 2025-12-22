@@ -335,6 +335,41 @@
         </div>
     </div>
 
+    <!-- Unverified Error Modal -->
+    <div class="modal" id="unverifiedModal">
+        <div class="modal-content modal-error">
+            <div class="error-icon"><i class="fas fa-lock"></i></div>
+            <h2>Account Verification Required</h2>
+            <p>You must verify your Discord account to submit suggestions and reports.</p>
+            <div class="modal-buttons">
+                <button class="btn-modal btn-modal-secondary" onclick="closeUnverifiedModal()">
+                    <i class="fas fa-times"></i> OK
+                </button>
+                <button class="btn-modal btn-modal-primary" onclick="handleVerifyNow()">
+                    <i class="fas fa-check"></i> Verify Now
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Success Notification -->
+    <div id="successNotification" class="success-notification">
+        <div class="notification-content">
+            <i class="fas fa-check-circle"></i>
+            <span id="notificationMessage">Operation completed successfully!</span>
+        </div>
+    </div>
+
+    <!-- Remove Admin Modal -->
+    <div class="modal" id="removeAdminModal">
+        <div class="modal-content">
+            <span class="close" data-modal="removeAdminModal">&times;</span>
+            <h2><i class="fas fa-trash"></i> Remove Administrator</h2>
+            <p class="section-description">Select an admin to remove:</p>
+            <div id="adminDropdownList" class="admin-dropdown-list"></div>
+        </div>
+    </div>
+
     <script src="script.js"></script>
 </body>
 </html>
