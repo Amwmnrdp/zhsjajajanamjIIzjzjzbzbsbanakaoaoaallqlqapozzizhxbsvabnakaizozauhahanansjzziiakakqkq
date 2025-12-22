@@ -542,58 +542,54 @@ h2 {
     margin-top: 20px;
 }
 
-.verified-circle {
-    position: relative;
-    width: 300px;
-    height: 300px;
-    border-radius: 50%;
-    border: 4px solid #FCD34D;
-    background: radial-gradient(circle, rgba(252, 211, 77, 0.1) 0%, rgba(16, 185, 129, 0.05) 100%);
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-start;
-    align-items: center;
-    padding-top: 15px;
-    box-shadow: 0 0 40px rgba(252, 211, 77, 0.4), inset 0 0 40px rgba(252, 211, 77, 0.1);
+.verified-square {
+    width: 100%;
+    max-width: 500px;
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(5, 150, 105, 0.15) 100%);
+    border: 3px solid #10b981;
+    border-radius: 12px;
+    padding: 40px;
+    box-shadow: 0 0 30px rgba(16, 185, 129, 0.3), inset 0 0 20px rgba(16, 185, 129, 0.1);
 }
 
-.hourglass-emoji {
-    font-size: 2.5em;
-    margin-bottom: 8px;
-    animation: sandFall 2s ease-in-out infinite;
-}
-
-@keyframes sandFall {
-    0% {
-        transform: rotateZ(-15deg);
-    }
-    50% {
-        transform: rotateZ(15deg);
-    }
-    100% {
-        transform: rotateZ(-15deg);
-    }
-}
-
-.circle-content {
+.square-content {
     text-align: center;
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
-    gap: 8px;
-    flex: 1;
+    gap: 15px;
 }
 
-.circle-timer-label {
+.verification-badge {
+    font-size: 3em;
+    animation: badgePulse 2s ease-in-out infinite;
+}
+
+@keyframes badgePulse {
+    0%, 100% {
+        transform: scale(1);
+        filter: drop-shadow(0 0 0 rgba(16, 185, 129, 0.5));
+    }
+    50% {
+        transform: scale(1.1);
+        filter: drop-shadow(0 0 20px rgba(16, 185, 129, 0.8));
+    }
+}
+
+.square-content h3 {
     color: #10b981;
-    font-size: 0.95em;
-    font-weight: 600;
+    font-size: 1.5em;
     margin: 0;
 }
 
-.circle-reactivation-text {
-    color: #FCD34D;
+.verification-status {
+    color: #a0a0a0;
+    font-size: 0.9em;
+    margin: 0;
+}
+
+.reactivation-message {
+    color: #a0a0a0;
     font-size: 0.85em;
     margin: 0;
 }

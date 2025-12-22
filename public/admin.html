@@ -89,6 +89,13 @@
             background: rgba(102, 126, 234, 0.1);
             border-radius: 10px;
             border: 1px solid rgba(102, 126, 234, 0.2);
+            transition: all 0.3s ease;
+        }
+
+        .admin-item:hover {
+            background: rgba(102, 126, 234, 0.15);
+            border-color: rgba(102, 126, 234, 0.4);
+            transform: translateX(5px);
         }
 
         .admin-item img {
@@ -106,6 +113,13 @@
             color: #e0e0e0;
             font-weight: 600;
             font-size: 1.1em;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .role-icon {
+            font-size: 1.2em;
         }
 
         .admin-id {
@@ -340,11 +354,21 @@
                 let adminListHTML = '';
                 
                 admins.forEach(admin => {
+                    let roleIcon = '';
+                    if (admin.is_owner) {
+                        roleIcon = '👑';
+                    } else {
+                        roleIcon = '🛠';
+                    }
+                    
                     adminListHTML += `
                         <div class="admin-item">
                             <img src="${admin.discord_avatar || 'https://cdn.discordapp.com/embed/avatars/0.png'}" alt="Avatar">
                             <div class="admin-info">
-                                <div class="admin-name">${escapeHtml(admin.discord_username || 'Unknown')}</div>
+                                <div class="admin-name">
+                                    ${isOwner ? `<span class="role-icon">${roleIcon}</span>` : ''}
+                                    ${escapeHtml(admin.discord_username || 'Unknown')}
+                                </div>
                                 <div class="admin-id">${admin.discord_id}</div>
                             </div>
                             ${admin.is_owner ? '<span class="owner-badge"><i class="fas fa-crown"></i> Owner</span>' : '<span class="admin-badge">Admin</span>'}
