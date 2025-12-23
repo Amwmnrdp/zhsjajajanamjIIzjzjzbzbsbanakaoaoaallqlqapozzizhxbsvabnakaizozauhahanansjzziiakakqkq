@@ -148,9 +148,7 @@ async function fetchUserProfile() {
         } else {
             avatarEl.src = 'https://cdn.discordapp.com/embed/avatars/0.png';
         }
-        const displayName = data.discord_username || data.username || 'Guest';
-        const username = data.username ? `(${data.username})` : '';
-        nameEl.textContent = username ? `${displayName} ${username}` : displayName;
+        nameEl.textContent = data.username || 'Guest';
         
         // Fetch admin list to determine user's role
         try {
