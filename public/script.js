@@ -127,7 +127,8 @@ async function fetchUserProfile() {
         if (data.discord_id) {
             const wasUnverified = !currentUser;
             currentUser = data;
-            if (wasUnverified) {
+            if (wasUnverified && !sessionStorage.getItem('verificationNotificationShown')) {
+                sessionStorage.setItem('verificationNotificationShown', 'true');
                 showSuccessNotification('✅ Account verification successful!');
             }
             isAdmin = data.is_admin || false;
@@ -147,7 +148,9 @@ async function fetchUserProfile() {
         } else {
             avatarEl.src = 'https://cdn.discordapp.com/embed/avatars/0.png';
         }
-        nameEl.textContent = data.username || 'Guest';
+        const displayName = data.discord_username || data.username || 'Guest';
+        const username = data.username ? `(${data.username})` : '';
+        nameEl.textContent = username ? `${displayName} ${username}` : displayName;
         
         // Fetch admin list to determine user's role
         try {
@@ -306,6 +309,10 @@ if (reportImage) {
 }
 
 function handleImageUpload(file) {
+    if (file.size > 100000) {
+        alert('Image size must be less than 100KB. Please compress your image and try again.');
+        return;
+    }
     const reader = new FileReader();
     reader.onload = (e) => {
         uploadedImageData = e.target.result;
@@ -381,7 +388,11 @@ if (reportForm) {
                 loadReports();
             } else {
                 const data = await response.json();
-                alert(data.error || 'Failed to submit report');
+                if (data.error.includes('value too long')) {
+                    alert('Your image is too large. Please use a smaller image (max 100KB) or reduce the description length.');
+                } else {
+                    alert(data.error || 'Failed to submit report');
+                }
             }
         } catch (error) {
             alert('Error submitting report');
@@ -804,11 +815,36 @@ async function showRemoveAdminModal() {
 }
 
 async function confirmRemoveAdmin(discordId, username) {
-    if (!confirm(`Are you sure you want to remove ${username} as an admin?`)) return;
+    const modal = document.createElement('div');
+    modal.className = 'modal active';
+    modal.innerHTML = `
+        <div class="modal-content modal-error">
+            <div class="error-icon"><i class="fas fa-exclamation-triangle"></i></div>
+            <h2>Remove Administrator?</h2>
+            <p>Are you sure you want to remove <strong>${escapeHtml(username)}</strong> as an admin?</p>
+            <p style="color: #888; font-size: 0.9em; margin-top: 10px;">This action cannot be undone.</p>
+            <div class="modal-buttons">
+                <button class="btn-modal btn-modal-secondary" onclick="this.closest('.modal').remove()">
+                    <i class="fas fa-times"></i> Cancel
+                </button>
+                <button class="btn-modal btn-modal-primary" onclick="performRemoveAdmin('${discordId}', this.closest('.modal'))">
+                    <i class="fas fa-trash-alt"></i> Remove Admin
+                </button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) modal.remove();
+    });
+}
 
+async function performRemoveAdmin(discordId, modalEl) {
     try {
         const response = await fetch(`/api/admins/${discordId}`, { method: 'DELETE' });
         if (response.ok) {
+            modalEl.remove();
+            document.getElementById('removeAdminModal').classList.remove('active');
             loadAdminPanel();
         } else {
             const error = await response.json();
