@@ -125,7 +125,11 @@ async function fetchUserProfile() {
         const data = await response.json();
         
         if (data.discord_id) {
+            const wasUnverified = !currentUser;
             currentUser = data;
+            if (wasUnverified) {
+                showSuccessNotification('✅ Account verification successful!');
+            }
             isAdmin = data.is_admin || false;
             verificationExpiresAt = data.expires_at || null;
         }
@@ -251,8 +255,7 @@ window.addEventListener('click', (e) => {
 if (postSuggestionBtn) {
     postSuggestionBtn.addEventListener('click', () => {
         if (!currentUser) {
-            alert('Please verify your Discord account first!');
-            showSection('activation');
+            document.getElementById('unverifiedModal').classList.add('active');
             return;
         }
         suggestionModal.classList.add('active');
@@ -262,8 +265,7 @@ if (postSuggestionBtn) {
 if (postReportBtn) {
     postReportBtn.addEventListener('click', () => {
         if (!currentUser) {
-            alert('Please verify your Discord account first!');
-            showSection('activation');
+            document.getElementById('unverifiedModal').classList.add('active');
             return;
         }
         reportModal.classList.add('active');
@@ -691,28 +693,28 @@ async function loadAdminPanel() {
                 </form>
             </div>
             <div style="background: linear-gradient(135deg, rgba(102, 126, 234, 0.08) 0%, rgba(118, 75, 162, 0.08) 100%); border: 1px solid rgba(102, 126, 234, 0.2); border-radius: 15px; padding: 30px;">
-                <h3 style="color: #667eea; margin-bottom: 20px;"><i class="fas fa-trash"></i> Remove Administrator</h3>
+                <h3 style="color: #667eea; margin-bottom: 20px;"><i class="fas fa-trash-alt"></i> Remove Administrator</h3>
                 <p style="color: #a0a0a0; margin-bottom: 20px; font-size: 0.95em;">Click below to see and remove admins from the list.</p>
                 <button class="btn-primary" onclick="showRemoveAdminModal()" style="width: 100%;"><i class="fas fa-list"></i> Select Admin to Remove</button>
             </div>`;
         }
         
-        html += '</div><div style="background: linear-gradient(135deg, rgba(102, 126, 234, 0.08) 0%, rgba(118, 75, 162, 0.08) 100%); border: 1px solid rgba(102, 126, 234, 0.2); border-radius: 15px; padding: 30px;"><h3 style="color: #667eea; margin-bottom: 20px;"><i class="fas fa-users-cog"></i> Current Administrators (' + admins.length + ')</h3><div id="adminsList" style="display: flex; flex-direction: column; gap: 12px;">';
+        html += '</div><div style="background: linear-gradient(135deg, rgba(102, 126, 234, 0.08) 0%, rgba(118, 75, 162, 0.08) 100%); border: 1px solid rgba(102, 126, 234, 0.2); border-radius: 15px; padding: 30px;"><h3 style="color: #667eea; margin-bottom: 20px;"><i class="fas fa-users-cog"></i> Current Administrators (' + admins.length + ')</h3><div id="adminsList" class="admin-dropdown-list">';
         
         if (admins.length === 0) {
             html += '<div style="text-align: center; padding: 20px; color: #666;"><i class="fas fa-user-slash"></i> No administrators yet</div>';
         } else {
             admins.forEach(admin => {
-                const roleIcon = admin.is_owner ? '👑' : '⚙️';
-                html += `<div style="background: rgba(102, 126, 234, 0.1); border: 1px solid rgba(102, 126, 234, 0.2); border-radius: 10px; padding: 15px 20px; display: flex; align-items: center; justify-content: space-between; gap: 15px;">
-                    <div>
-                        <div style="color: #e0e0e0; font-weight: 600; font-size: 1.05em; display: flex; align-items: center; gap: 8px;">
-                            ${isOwner ? '<span style="font-size: 1.2em;">' + roleIcon + '</span>' : ''}
-                            ${escapeHtml(admin.discord_username || 'Unknown')}
+                const avatarUrl = admin.avatar ? `https://cdn.discordapp.com/avatars/${admin.discord_id}/${admin.avatar}.png?size=256` : 'https://cdn.discordapp.com/embed/avatars/0.png';
+                html += `<div class="admin-list-item">
+                    <div class="admin-list-content">
+                        <img src="${avatarUrl}" alt="${escapeHtml(admin.discord_username)}" class="admin-avatar" onerror="this.src='https://cdn.discordapp.com/embed/avatars/0.png'">
+                        <div class="admin-info">
+                            <div class="admin-name">${escapeHtml(admin.discord_username || 'Unknown')}</div>
+                            <div class="admin-id-text">${admin.discord_id}</div>
                         </div>
-                        <div style="color: #888; font-size: 0.85em; margin-top: 4px; font-family: 'Courier New', monospace;">${admin.discord_id}</div>
                     </div>
-                    <span style="background: ${admin.is_owner ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'}; color: white; padding: 4px 12px; border-radius: 20px; font-size: 0.75em; font-weight: 600;">
+                    <span class="admin-role-badge ${admin.is_owner ? 'admin-role-owner' : 'admin-role-admin'}">
                         <i class="fas ${admin.is_owner ? 'fa-crown' : 'fa-cog'}"></i> ${admin.is_owner ? 'Owner' : 'Admin'}
                     </span>
                 </div>`;
@@ -782,16 +784,23 @@ async function showRemoveAdminModal() {
     
     let html = '';
     removableAdmins.forEach(admin => {
-        html += `<div style="background: rgba(102, 126, 234, 0.1); border: 1px solid rgba(102, 126, 234, 0.2); border-radius: 10px; padding: 15px 20px; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; gap: 15px;">
-            <div style="flex: 1;">
-                <div style="color: #e0e0e0; font-weight: 600;"><i class="fas fa-cog"></i> ${escapeHtml(admin.discord_username || 'Unknown')}</div>
-                <div style="color: #888; font-size: 0.85em; margin-top: 4px; font-family: 'Courier New', monospace;">${admin.discord_id}</div>
+        const avatarUrl = admin.avatar ? `https://cdn.discordapp.com/avatars/${admin.discord_id}/${admin.avatar}.png?size=256` : 'https://cdn.discordapp.com/embed/avatars/0.png';
+        html += `<div class="admin-dropdown-item">
+            <div class="admin-item-content">
+                <img src="${avatarUrl}" alt="${escapeHtml(admin.discord_username)}" class="admin-item-avatar" onerror="this.src='https://cdn.discordapp.com/embed/avatars/0.png'">
+                <div class="admin-item-info">
+                    <div class="admin-item-name">${escapeHtml(admin.discord_username || 'Unknown')}</div>
+                    <div class="admin-item-id">${admin.discord_id}</div>
+                </div>
             </div>
-            <button onclick="confirmRemoveAdmin('${admin.discord_id}', '${escapeHtml(admin.discord_username || 'Unknown')}')" style="background: rgba(239, 68, 68, 0.2); border: none; color: #ef4444; width: 36px; height: 36px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.1em;" title="Remove Admin"><i class="fas fa-trash"></i></button>
+            <button type="button" class="btn-delete-admin" onclick="confirmRemoveAdmin('${admin.discord_id}', '${escapeHtml(admin.discord_username || 'Unknown')}')" title="Delete Admin">
+                <i class="fas fa-trash-alt"></i>
+            </button>
         </div>`;
     });
     
-    alert('Click OK and then use the admin list above to remove admins. Available admins to remove:\n\n' + removableAdmins.map(a => a.discord_username).join('\n'));
+    document.getElementById('adminDropdownList').innerHTML = html;
+    document.getElementById('removeAdminModal').classList.add('active');
 }
 
 async function confirmRemoveAdmin(discordId, username) {
@@ -814,8 +823,8 @@ async function claimAdminOwnership() {
     try {
         const response = await fetch('/api/set-owner', { method: 'POST' });
         if (response.ok) {
-            alert('You are now the owner!');
-            loadAdminPanel();
+            showSuccessNotification('You are now the owner!');
+            setTimeout(() => loadAdminPanel(), 500);
         } else {
             const error = await response.json();
             alert(error.error || 'Failed to claim ownership');
@@ -823,6 +832,25 @@ async function claimAdminOwnership() {
     } catch (error) {
         alert('Error claiming ownership');
     }
+}
+
+function closeUnverifiedModal() {
+    document.getElementById('unverifiedModal').classList.remove('active');
+}
+
+function handleVerifyNow() {
+    document.getElementById('unverifiedModal').classList.remove('active');
+    showSection('activation');
+}
+
+function showSuccessNotification(message) {
+    const notification = document.getElementById('successNotification');
+    document.getElementById('notificationMessage').textContent = message;
+    notification.classList.add('show');
+    
+    setTimeout(() => {
+        notification.classList.remove('show');
+    }, 5000);
 }
 
 if (window.location.hash === '#activation') {
