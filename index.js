@@ -67,7 +67,7 @@ let currentVerifiedUser = null;
 async function initializeBot() {
     try {
         await db.initDatabase();
-        console.log('✅ Database initialized');
+        console.log('✅ Database const expre');
     } catch (error) {
         console.error('❌ Database initialization failed:', error.message);
     }
