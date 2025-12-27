@@ -1,7 +1,6 @@
-const { Pool } = require('pg');
-
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false } // مهم للاتصال بـ Neon من Render
 });
 
 async function initDatabase() {
