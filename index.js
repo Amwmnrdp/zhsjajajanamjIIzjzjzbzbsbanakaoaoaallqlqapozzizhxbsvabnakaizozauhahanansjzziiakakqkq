@@ -151,6 +151,7 @@ async function checkVerification(interaction, langCode) {
     return true;
 }
 
+
 async function checkPermissions(interaction, langCode) {
     const commandName = interaction.commandName;
 
@@ -158,28 +159,28 @@ async function checkPermissions(interaction, langCode) {
 
     if (OWNER_ONLY_COMMANDS.includes(commandName)) {
         if (!interaction.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
+            const title = await t('Permission Denied', langCode);
+            const description = await t('Only the server owner or administrators can use this command.', langCode);
             const embed = new EmbedBuilder()
-                .setTitle('🚫 ' + await t('Permission Denied', langCode))
-                .setDescription(await t('Only the server owner or administrators can use this command.', langCode))
+                .setTitle('🚫 ' + title)
+                .setDescription(description)
                 .setColor('#FF0000');
-
             await interaction.reply({ embeds: [embed], ephemeral: true });
             return false;
         }
         return true;
     }
 
-    return true;
-}
-    
     if (EMOJI_PERMISSION_COMMANDS.includes(commandName)) {
         const hasManageEmoji = interaction.member.permissions.has(PermissionsBitField.Flags.ManageGuildExpressions) ||
                                interaction.member.permissions.has(PermissionsBitField.Flags.ManageEmojisAndStickers);
         
         if (!hasManageEmoji) {
+            const title = await t('Permission Denied', langCode);
+            const description = await t('You need the "Manage Emojis and Stickers" permission to use this command.', langCode);
             const embed = new EmbedBuilder()
-                .setTitle('🚫 ' + await t('Permission Denied', langCode))
-                .setDescription(await t('You need the "Manage Emojis and Stickers" permission to use this command.', langCode))
+                .setTitle('🚫 ' + title)
+                .setDescription(description)
                 .setColor('#FF0000');
             await interaction.reply({ embeds: [embed], ephemeral: true });
             return false;
@@ -217,69 +218,103 @@ client.on('interactionCreate', async interaction => {
     if (!hasPermission) return;
 
     try {
-        if (interaction.commandName === 'ping') await ping.execute(interaction);
-        else if (interaction.commandName === 'help') await help.execute(interaction, langCode);
-        else if (interaction.commandName === 'permission') await permission.execute(interaction, langCode);
-        else if (interaction.commandName === 'emoji_search') await emojisearch.execute(interaction, langCode, client);
-        else if (interaction.commandName === 'suggest_emojis') await suggestemojis.execute(interaction, langCode, client);
-        else if (interaction.commandName === 'add_emoji') await addemojiCmd.execute(interaction, langCode);
-        else if (interaction.commandName === 'image_to_emoji') await imagetoemoji.execute(interaction, langCode, usedUrls);
-        else if (interaction.commandName === 'emoji_to_sticker') await emojiTosticker.execute(interaction, langCode, convertedEmojisToStickers);
-        else if (interaction.commandName === 'list_emojis') await listemoji.execute(interaction, langCode);
-        else if (interaction.commandName === 'language') await language.execute(interaction, langCode);
-        else if (interaction.commandName === 'delete_emoji') await deletemoji.execute(interaction, langCode, convertedStickersToEmojis);
-        else if (interaction.commandName === 'rename_emoji') await renameemoji.execute(interaction, langCode);
-        else if (interaction.commandName === 'delete_sticker') {
-            const msg = await deletesticker.execute(interaction, langCode);
-            stickerDeletionSessions.set(msg.id, {
-                guildId: interaction.guild.id,
-                userId: interaction.user.id,
-                langCode: langCode,
-                messageId: msg.id,
-                channelId: msg.channel.id
-            });
-            setTimeout(() => stickerDeletionSessions.has(msg.id) && stickerDeletionSessions.delete(msg.id), 60000);
-        }
-        else if (interaction.commandName === 'rename_sticker') {
-            const msg = await renamesticker.execute(interaction, langCode);
-            const newName = interaction.options.getString('name');
-            stickerRenameSessions.set(msg.id, {
-                guildId: interaction.guild.id,
-                userId: interaction.user.id,
-                langCode: langCode,
-                messageId: msg.id,
-                channelId: msg.channel.id,
-                newName: newName
-            });
-            setTimeout(() => stickerRenameSessions.has(msg.id) && stickerRenameSessions.delete(msg.id), 60000);
-        }
-        else if (interaction.commandName === 'sticker_to_emoji') {
-            const msg = await stickertoemi.execute(interaction, langCode);
-            const emojiName = interaction.options.getString('name');
-            stickerToEmojiSessions.set(msg.id, {
-                guildId: interaction.guild.id,
-                userId: interaction.user.id,
-                langCode: langCode,
-                messageId: msg.id,
-                channelId: msg.channel.id,
-                emojiName: emojiName
-            });
-            setTimeout(() => stickerToEmojiSessions.has(msg.id) && stickerToEmojiSessions.delete(msg.id), 60000);
-        }
-        else if (interaction.commandName === 'image_to_sticker') await imagetosticker.execute(interaction, langCode, convertedImagesToStickers);
-        else if (interaction.commandName === 'list_stickers') await liststicker.execute(interaction, langCode);
-        else if (interaction.commandName === 'add_sticker') {
-            const msg = await addsticker.execute(interaction, langCode);
-            const customName = interaction.options.getString('name');
-            stickerAddSessions.set(msg.id, {
-                guildId: interaction.guild.id,
-                userId: interaction.user.id,
-                langCode: langCode,
-                messageId: msg.id,
-                channelId: msg.channel.id,
-                customName: customName
-            });
-            setTimeout(() => stickerAddSessions.has(msg.id) && stickerAddSessions.delete(msg.id), 60000);
+        switch(interaction.commandName) {
+            case 'ping':
+                await ping.execute(interaction);
+                break;
+            case 'help':
+                await help.execute(interaction, langCode);
+                break;
+            case 'permission':
+                await permission.execute(interaction, langCode);
+                break;
+            case 'emoji_search':
+                await emojisearch.execute(interaction, langCode, client);
+                break;
+            case 'suggest_emojis':
+                await suggestemojis.execute(interaction, langCode, client);
+                break;
+            case 'add_emoji':
+                await addemojiCmd.execute(interaction, langCode);
+                break;
+            case 'image_to_emoji':
+                await imagetoemoji.execute(interaction, langCode, usedUrls);
+                break;
+            case 'emoji_to_sticker':
+                await emojiTosticker.execute(interaction, langCode, convertedEmojisToStickers);
+                break;
+            case 'list_emojis':
+                await listemoji.execute(interaction, langCode);
+                break;
+            case 'language':
+                await language.execute(interaction, langCode);
+                break;
+            case 'delete_emoji':
+                await deletemoji.execute(interaction, langCode, convertedStickersToEmojis);
+                break;
+            case 'rename_emoji':
+                await renameemoji.execute(interaction, langCode);
+                break;
+            case 'delete_sticker': {
+                const msg = await deletesticker.execute(interaction, langCode);
+                stickerDeletionSessions.set(msg.id, {
+                    guildId: interaction.guild.id,
+                    userId: interaction.user.id,
+                    langCode: langCode,
+                    messageId: msg.id,
+                    channelId: msg.channel.id
+                });
+                setTimeout(() => stickerDeletionSessions.has(msg.id) && stickerDeletionSessions.delete(msg.id), 60000);
+                break;
+            }
+            case 'rename_sticker': {
+                const msg = await renamesticker.execute(interaction, langCode);
+                const newName = interaction.options.getString('name');
+                stickerRenameSessions.set(msg.id, {
+                    guildId: interaction.guild.id,
+                    userId: interaction.user.id,
+                    langCode: langCode,
+                    messageId: msg.id,
+                    channelId: msg.channel.id,
+                    newName: newName
+                });
+                setTimeout(() => stickerRenameSessions.has(msg.id) && stickerRenameSessions.delete(msg.id), 60000);
+                break;
+            }
+            case 'sticker_to_emoji': {
+                const msg = await stickertoemi.execute(interaction, langCode);
+                const emojiName = interaction.options.getString('name');
+                stickerToEmojiSessions.set(msg.id, {
+                    guildId: interaction.guild.id,
+                    userId: interaction.user.id,
+                    langCode: langCode,
+                    messageId: msg.id,
+                    channelId: msg.channel.id,
+                    emojiName: emojiName
+                });
+                setTimeout(() => stickerToEmojiSessions.has(msg.id) && stickerToEmojiSessions.delete(msg.id), 60000);
+                break;
+            }
+            case 'image_to_sticker':
+                await imagetosticker.execute(interaction, langCode, convertedImagesToStickers);
+                break;
+            case 'list_stickers':
+                await liststicker.execute(interaction, langCode);
+                break;
+            case 'add_sticker': {
+                const msg = await addsticker.execute(interaction, langCode);
+                const customName = interaction.options.getString('name');
+                stickerAddSessions.set(msg.id, {
+                    guildId: interaction.guild.id,
+                    userId: interaction.user.id,
+                    langCode: langCode,
+                    messageId: msg.id,
+                    channelId: msg.channel.id,
+                    customName: customName
+                });
+                setTimeout(() => stickerAddSessions.has(msg.id) && stickerAddSessions.delete(msg.id), 60000);
+                break;
+            }
         }
     } catch (error) {
         console.error('⚠️ Interaction error:', error.message);
