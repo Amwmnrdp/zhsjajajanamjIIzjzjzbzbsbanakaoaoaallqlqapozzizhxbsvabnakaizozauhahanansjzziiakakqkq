@@ -10,6 +10,25 @@ const db = require('./src/utils/database');
 const { SUPPORTED_LANGUAGES, COMMAND_DEFINITIONS, OWNER_ONLY_COMMANDS, PUBLIC_COMMANDS, EMOJI_PERMISSION_COMMANDS } = require('./src/utils/constants');
 const { t, preWarmCache } = require('./src/utils/languages');
 
+
+// ================== تشغيل السيرفر Express ==================
+const PORT = process.env.PORT || 5000;
+
+app.use(express.static(path.join(__dirname, 'public'))); // index.html في مجلد public
+app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+
+// ================== تسجيل دخول البوت ==================
+client.once('ready', () => {
+    console.log(`✅ Logged in as ${client.user.tag}`);
+});
+
+client.login(DISCORD_TOKEN);
+
+// ================== تشغيل السيرفر ==================
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`🌐 Web server running on port ${PORT}`);
+});
+
 const addemojiCmd = require('./src/commands/emoji/addemoji');
 const listemoji = require('./src/commands/emoji/listemoji');
 const deletemoji = require('./src/commands/emoji/deletemoji');
@@ -111,40 +130,25 @@ client.on('guildDelete', async guild => {
         await db.removeServer(guild.id);
         console.log(`❌ Left: ${guild.name}`);
     } catch (error) {
-        console.error('Error removing server:', error.message);
-    }
-});
-
-async function checkVerification(interaction, langCode) {
-    const userId = interaction.user.id;
-    const isVerified = await db.isUserVerifiedDb(userId);
-    
-    if (!isVerified) {
-        const embed = new EmbedBuilder()
-            .setTitle('🔐 ' + await t('Verification Required', langCode))
-            .setDescription(await t('You must verify your Discord account before using commands.', langCode) + 
-                `\n\n**${await t('Verification is required every 5 hours for security.', langCode)}**\n\n` +
-                `🔗 **${await t('Click here to verify:', langCode)}** ${WEBSITE_URL}/#activation`)
-            .setColor('#FF6B6B')
-            .setFooter({ text: await t('This message is only visible to you.', langCode) });
+r) {
+   consolenerror('Error removing server:'veerroremessage)sage);} }) }
+asyncafunctionccheckVerification(interactionctlangCode)C{de) {constcuserIdserinteractioncuser.ider.id;constcisVerifiedifiawaitadbiisUserVerifiedDb(userId)erId);
+    if ( isVerified)f{ed) {
+   constcembedembnew=EmbedBuilder()der()
+        setTitle('🔐 ''🔐awaitat('Verification Required'irlangCode))ode))
+        setDescription(awaitat('You must verify your Discord account before using commands.'ndlangCode)Code) + 
+           `    **${awaitat('Verification is required every 5 hours for security.'itlangCode)}**e)}*`\n\n` +
+           `🔗 **${awaitat('Click here to verify:'iflangCode)}** ${WEBSITE_URL}/#activation`)ion`)
+        setColor('#FF6B6B')B6B')
+        setFooter({ttext tawaitat('This message is only visible to you.'yolangCode)C})e) });
         
-        await interaction.reply({ embeds: [embed], ephemeral: true });
-        return false;
-    }
-    return true;
-}
-
-async function checkPermissions(interaction, langCode) {
-    const commandName = interaction.commandName;
-    
-    if (PUBLIC_COMMANDS.includes(commandName)) {
-        return true;
-    }
-    
-    if (OWNER_ONLY_COMMANDS.includes(commandName)) {
-        if (!interaction.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
-            const embed = new EmbedBuilder()
-                .setTitle('🚫 ' + await t('Permission Denied', langCode))
+   awaitainteractioncreply({pembedsmb[embed]mbephemeralmetrue })ue });
+   returnefalsefalse;}    }returnetrue t}ueasyncafunctionccheckPermissions(interactionctlangCode)C{de) {constccommandNamedNainteractionccommandNamedName;
+    if (PUBLIC_COMMANDSMincludes(commandName))a{e)) {
+   returnetrue true;}    }
+    if (OWNER_ONLY_COMMANDSMincludes(commandName))a{e)) {
+   if ( interactioncmemberepermissionsshas(PermissionsBitFieldFFlagsFAdministrator))t{r)) {
+       constcembedembnew=EmbedBuilder()d                .setTitle('🚫 ' + await t('Permission Denied', langCode))
                 .setDescription(await t('Only the server owner or administrators can use this command.', langCode))
                 .setColor('#FF0000');
             await interaction.reply({ embeds: [embed], ephemeral: true });
