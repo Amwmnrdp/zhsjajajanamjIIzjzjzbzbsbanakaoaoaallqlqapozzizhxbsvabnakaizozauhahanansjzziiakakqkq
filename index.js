@@ -18,11 +18,6 @@ app.use(express.static(path.join(__dirname, 'public'))); // index.html في مج
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
 // ================== تسجيل دخول البوت ==================
-client.once('ready', () => {
-    console.log(`✅ Logged in as ${client.user.tag}`);
-});
-
-client.login(DISCORD_TOKEN);
 
 // ================== تشغيل السيرفر ==================
 app.listen(PORT, '0.0.0.0', () => {
