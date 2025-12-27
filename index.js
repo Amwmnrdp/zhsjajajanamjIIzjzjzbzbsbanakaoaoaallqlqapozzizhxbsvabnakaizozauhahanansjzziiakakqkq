@@ -33,13 +33,10 @@ const help = require('./src/commands/storage/help');
 
 const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID;
 const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET;
-const REDIRECT_URI = process.env.REPLIT_DEV_DOMAIN 
-    ? `https://${process.env.REPLIT_DEV_DOMAIN}/auth/discord/callback`
-    : 'http://localhost:3000/auth/discord/callback';
 
-const WEBSITE_URL = process.env.REPLIT_DEV_DOMAIN 
-    ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-    : 'http://localhost:3000';
+// رابط موقعك الحقيقي من Render أو أي استضافة
+const WEBSITE_URL = process.env.WEBSITE_URL || "https://placeholder.com";
+const REDIRECT_URI = `${WEBSITE_URL}/auth/discord/callback`;
 
 const client = new Client({
     intents: [
