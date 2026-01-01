@@ -85,7 +85,7 @@ const COMMAND_DEFINITIONS = [
                 name: 'attachment',
                 type: 11,
                 description: 'Upload an image',
-                required: false
+                required: true
             },
             {
                 name: 'url',
@@ -109,7 +109,7 @@ const COMMAND_DEFINITIONS = [
                 name: 'attachment',
                 type: 11,
                 description: 'Upload an image',
-                required: false
+                required: true
             },
             {
                 name: 'url',

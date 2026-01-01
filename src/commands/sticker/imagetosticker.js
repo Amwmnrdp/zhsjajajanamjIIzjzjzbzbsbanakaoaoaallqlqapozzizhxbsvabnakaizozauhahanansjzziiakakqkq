@@ -13,6 +13,16 @@ async function execute(interaction, langCode, convertedImagesToStickers) {
     const urlOption = interaction.options.getString('url');
     const attachment = interaction.options.getAttachment('attachment');
 
+    // Clean name (2-32 chars)
+    const cleanedName = nameOption.substring(0, 32);
+    if (cleanedName.length < 2) {
+        const embed = new EmbedBuilder()
+            .setDescription('❌ ' + await t('Sticker name must be between 2 and 32 characters.', langCode))
+            .setColor('#FF0000');
+        await interaction.reply({ embeds: [embed], ephemeral: true });
+        return;
+    }
+
     if (urlOption && attachment) {
         const embed = new EmbedBuilder()
             .setDescription('❌ ' + await t('You cannot provide both a URL and an attachment!', langCode))
@@ -22,20 +32,14 @@ async function execute(interaction, langCode, convertedImagesToStickers) {
         return;
     }
 
-    if (!urlOption && !attachment) {
+    const finalUrl = attachment ? attachment.url : urlOption;
+
+    if (!finalUrl) {
         const embed = new EmbedBuilder()
             .setDescription('❌ ' + await t('You must provide either a URL or an attachment!', langCode))
             .setColor('#FF0000')
             .setFooter({ text: `${interaction.user.displayName} (@${interaction.user.username})`, iconURL: interaction.user.displayAvatarURL() });
         await interaction.reply({ embeds: [embed], ephemeral: true });
-        return;
-    }
-
-    const finalUrl = attachment ? attachment.url : urlOption;
-
-    if (!isImageUrl(finalUrl) && !attachment) {
-        const embed = new EmbedBuilder().setDescription('❌ ' + await t('Invalid image URL!', langCode)).setColor('#FF0000').setFooter({ text: `${interaction.user.displayName} (@${interaction.user.username})`, iconURL: interaction.user.displayAvatarURL() });
-        await interaction.reply({ embeds: [embed] });
         return;
     }
 
@@ -56,14 +60,15 @@ async function execute(interaction, langCode, convertedImagesToStickers) {
     try {
         const sticker = await interaction.guild.stickers.create({
             file: finalUrl,
-            name: nameOption,
+            name: cleanedName,
             description: await t('Converted from image', langCode),
+            tags: 'emoji', // Required for some sticker types
             reason: `By ${interaction.user.tag}`
         });
 
         const embed = new EmbedBuilder()
             .setTitle('✅ ' + await t('Sticker Created!', langCode))
-            .setDescription(await t('Successfully converted image to sticker!', langCode) + `\n\n**${await t('Sticker Name:', langCode)}** ${nameOption}\n**${await t('Sticker ID:', langCode)}** ${sticker.id}`)
+            .setDescription(await t('Successfully converted image to sticker!', langCode) + `\n\n**${await t('Sticker Name:', langCode)}** ${cleanedName}\n**${await t('Sticker ID:', langCode)}** ${sticker.id}`)
             .setImage(finalUrl)
             .setColor('#00FF00')
             .setFooter({ text: await t('You can now use this sticker in your server!', langCode) + ` • ${interaction.user.displayName} (@${interaction.user.username})`, iconURL: interaction.user.displayAvatarURL() });
@@ -71,7 +76,7 @@ async function execute(interaction, langCode, convertedImagesToStickers) {
         await interaction.reply({ embeds: [embed] });
         convertedImagesToStickers.set(imageTrackingKey, {
             stickerId: sticker.id,
-            stickerName: nameOption,
+            stickerName: cleanedName,
             imageUrl: finalUrl
         });
     } catch (error) {
@@ -80,7 +85,7 @@ async function execute(interaction, langCode, convertedImagesToStickers) {
             error.code === 50138 ?
             await t('File must be under 512KB', langCode) :
             error.code === 50035 ?
-            await t('Invalid request format', langCode) :
+            await t('Invalid request:', langCode) + ' ' + (error.errors?.name?._errors?.[0] || error.message) :
             await t('Error:', langCode) + ' ' + error.message;
         const embed = new EmbedBuilder()
             .setDescription(`❌ ${errorMsg}`)
