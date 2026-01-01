@@ -17,6 +17,8 @@ const renameemoji = require('./src/commands/emoji/renameemoji');
 const emojisearch = require('./src/commands/emoji/emojisearch');
 const imagetoemoji = require('./src/commands/emoji/imagetoemoji');
 const emojiTosticker = require('./src/commands/emoji/emojiTosticker');
+const emojitoimage = require('./src/commands/emoji/emojitoimage');
+const enhanceemoji = require('./src/commands/emoji/enhanceemoji');
 const suggestemojis = require('./src/commands/emoji/suggestemojis');
 
 const addsticker = require('./src/commands/sticker/addsticker');
@@ -24,6 +26,8 @@ const deletesticker = require('./src/commands/sticker/deletesticker');
 const renamesticker = require('./src/commands/sticker/renamesticker');
 const stickertoemi = require('./src/commands/sticker/stickertoemi');
 const imagetosticker = require('./src/commands/sticker/imagetosticker');
+const stickertoimage = require('./src/commands/sticker/stickertoimage');
+const enhancesticker = require('./src/commands/sticker/enhancesticker');
 const liststicker = require('./src/commands/sticker/liststicker');
 
 const ping = require('./src/commands/storage/ping');
@@ -251,6 +255,10 @@ client.on('interactionCreate', async interaction => {
             setTimeout(() => stickerToEmojiSessions.has(msg.id) && stickerToEmojiSessions.delete(msg.id), 60000);
         }
         else if (interaction.commandName === 'image_to_sticker') await imagetosticker.execute(interaction, langCode, convertedImagesToStickers);
+        else if (interaction.commandName === 'emoji_to_image') await emojitoimage.execute(interaction, langCode);
+        else if (interaction.commandName === 'sticker_to_image') await stickertoimage.execute(interaction, langCode);
+        else if (interaction.commandName === 'enhance_emoji') await enhanceemoji.execute(interaction, langCode);
+        else if (interaction.commandName === 'enhance_sticker') await enhancesticker.execute(interaction, langCode);
         else if (interaction.commandName === 'list_stickers') await liststicker.execute(interaction, langCode);
         else if (interaction.commandName === 'add_sticker') {
             const msg = await addsticker.execute(interaction, langCode);
