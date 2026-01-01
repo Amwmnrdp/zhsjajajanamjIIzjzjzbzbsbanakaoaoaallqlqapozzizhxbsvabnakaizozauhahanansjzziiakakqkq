@@ -82,28 +82,16 @@ const COMMAND_DEFINITIONS = [
                 required: true
             },
             {
+                name: 'attachment',
+                type: 11,
+                description: 'Upload an image',
+                required: false
+            },
+            {
                 name: 'url',
                 type: 3,
                 description: 'Image URL',
-                required: true
-            }
-        ]
-    },
-    {
-        name: 'emoji_to_sticker',
-        description: 'Convert emoji to sticker',
-        options: [
-            {
-                name: 'emoji',
-                type: 3,
-                description: 'The emoji to convert',
-                required: true
-            },
-            {
-                name: 'name',
-                type: 3,
-                description: 'Sticker name',
-                required: true
+                required: false
             }
         ]
     },
@@ -112,18 +100,64 @@ const COMMAND_DEFINITIONS = [
         description: 'Convert image to sticker',
         options: [
             {
-                name: 'url',
-                type: 3,
-                description: 'Image URL',
-                required: true
-            },
-            {
                 name: 'name',
                 type: 3,
                 description: 'Sticker name',
                 required: true
+            },
+            {
+                name: 'attachment',
+                type: 11,
+                description: 'Upload an image',
+                required: false
+            },
+            {
+                name: 'url',
+                type: 3,
+                description: 'Image URL',
+                required: false
             }
         ]
+    },
+    {
+        name: 'emoji_to_image',
+        description: 'Convert an emoji to an image',
+        options: [
+            {
+                name: 'emoji',
+                type: 3,
+                description: 'The emoji to convert',
+                required: true
+            }
+        ]
+    },
+    {
+        name: 'sticker_to_image',
+        description: 'Convert a sticker to an image',
+        options: [
+            {
+                name: 'sticker',
+                type: 3,
+                description: 'The sticker to convert (ID or name)',
+                required: true
+            }
+        ]
+    },
+    {
+        name: 'enhance_emoji',
+        description: 'Improve an emoji\'s quality and add it to the server',
+        options: [
+            {
+                name: 'emoji',
+                type: 3,
+                description: 'The emoji to enhance',
+                required: true
+            }
+        ]
+    },
+    {
+        name: 'enhance_sticker',
+        description: 'Improve a sticker\'s quality and save it to the server'
     },
     {
         name: 'list_emojis',
