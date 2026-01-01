@@ -1,6 +1,7 @@
 const { EmbedBuilder, PermissionsBitField } = require('discord.js');
 const isImageUrl = require('is-image-url');
 const { t } = require('../../utils/languages');
+const axios = require('axios');
 
 async function execute(interaction, langCode, convertedImagesToStickers) {
     if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageEmojisAndStickers)) {
@@ -13,7 +14,6 @@ async function execute(interaction, langCode, convertedImagesToStickers) {
     const urlOption = interaction.options.getString('url');
     const attachment = interaction.options.getAttachment('attachment');
 
-    // Clean name (2-32 chars)
     const cleanedName = nameOption.substring(0, 32);
     if (cleanedName.length < 2) {
         const embed = new EmbedBuilder()
@@ -26,73 +26,63 @@ async function execute(interaction, langCode, convertedImagesToStickers) {
     if (urlOption && attachment) {
         const embed = new EmbedBuilder()
             .setDescription('❌ ' + await t('You cannot provide both a URL and an attachment!', langCode))
-            .setColor('#FF0000')
-            .setFooter({ text: `${interaction.user.displayName} (@${interaction.user.username})`, iconURL: interaction.user.displayAvatarURL() });
+            .setColor('#FF0000');
         await interaction.reply({ embeds: [embed], ephemeral: true });
         return;
     }
 
     const finalUrl = attachment ? attachment.url : urlOption;
-
     if (!finalUrl) {
         const embed = new EmbedBuilder()
             .setDescription('❌ ' + await t('You must provide either a URL or an attachment!', langCode))
-            .setColor('#FF0000')
-            .setFooter({ text: `${interaction.user.displayName} (@${interaction.user.username})`, iconURL: interaction.user.displayAvatarURL() });
+            .setColor('#FF0000');
         await interaction.reply({ embeds: [embed], ephemeral: true });
         return;
     }
 
+    await interaction.deferReply();
+
     const imageTrackingKey = `${interaction.guild.id}:${finalUrl}`;
     if (convertedImagesToStickers.has(imageTrackingKey)) {
         const stickerInfo = convertedImagesToStickers.get(imageTrackingKey);
-        const stickerUrl = `https://cdn.discordapp.com/stickers/${stickerInfo.stickerId}.png`;
         const embed = new EmbedBuilder()
             .setTitle('⚠️ ' + await t('Image Already Converted!', langCode))
-            .setDescription(await t('This image has already been converted to a sticker!', langCode) + `\n\n**${await t('Existing Sticker Name:', langCode)}** ${stickerInfo.stickerName}\n**${await t('Sticker ID:', langCode)}** ${stickerInfo.stickerId}\n\n${await t('Delete the sticker to convert again.', langCode)}`)
-            .setThumbnail(stickerUrl)
-            .setColor('#FF9900')
-            .setFooter({ text: await t('This conversion is already done.', langCode) + ` • ${interaction.user.displayName} (@${interaction.user.username})`, iconURL: interaction.user.displayAvatarURL() });
-        await interaction.reply({ embeds: [embed] });
+            .setDescription(await t('This image has already been converted to a sticker!', langCode))
+            .setColor('#FF9900');
+        await interaction.editReply({ embeds: [embed] });
         return;
     }
 
     try {
+        // Fetch the image as a buffer to ensure it's a valid asset for stickers
+        const response = await axios.get(finalUrl, { responseType: 'arraybuffer' });
+        const buffer = Buffer.from(response.data, 'utf-8');
+
         const sticker = await interaction.guild.stickers.create({
-            file: finalUrl,
+            file: buffer,
             name: cleanedName,
-            description: await t('Converted from image', langCode),
-            tags: 'emoji', // Required for some sticker types
+            description: 'Converted by ProEmoji',
+            tags: 'emoji',
             reason: `By ${interaction.user.tag}`
         });
 
         const embed = new EmbedBuilder()
             .setTitle('✅ ' + await t('Sticker Created!', langCode))
-            .setDescription(await t('Successfully converted image to sticker!', langCode) + `\n\n**${await t('Sticker Name:', langCode)}** ${cleanedName}\n**${await t('Sticker ID:', langCode)}** ${sticker.id}`)
+            .setDescription(await t('Successfully converted image to sticker!', langCode) + `\n**Name:** ${cleanedName}`)
             .setImage(finalUrl)
-            .setColor('#00FF00')
-            .setFooter({ text: await t('You can now use this sticker in your server!', langCode) + ` • ${interaction.user.displayName} (@${interaction.user.username})`, iconURL: interaction.user.displayAvatarURL() });
+            .setColor('#00FF00');
 
-        await interaction.reply({ embeds: [embed] });
+        await interaction.editReply({ embeds: [embed] });
         convertedImagesToStickers.set(imageTrackingKey, {
             stickerId: sticker.id,
             stickerName: cleanedName,
             imageUrl: finalUrl
         });
     } catch (error) {
-        const errorMsg = error.code === 50045 ?
-            await t('Image URL is invalid or unavailable', langCode) :
-            error.code === 50138 ?
-            await t('File must be under 512KB', langCode) :
-            error.code === 50035 ?
-            await t('Invalid request:', langCode) + ' ' + (error.errors?.name?._errors?.[0] || error.message) :
-            await t('Error:', langCode) + ' ' + error.message;
-        const embed = new EmbedBuilder()
-            .setDescription(`❌ ${errorMsg}`)
-            .setColor('#FF0000')
-            .setFooter({ text: `${interaction.user.displayName} (@${interaction.user.username})`, iconURL: interaction.user.displayAvatarURL() });
-        await interaction.reply({ embeds: [embed] });
-        console.error(`⚠️ Discord Error in image_to_sticker:`, error.code, error.message);
+        const errorMsg = error.code === 50035 ? 'Invalid Asset or Format' : error.message;
+        const embed = new EmbedBuilder().setDescription(`❌ ${errorMsg}`).setColor('#FF0000');
+        await interaction.editReply({ embeds: [embed] });
+        console.error(`⚠️ Sticker Error:`, error);
     }
 }
 

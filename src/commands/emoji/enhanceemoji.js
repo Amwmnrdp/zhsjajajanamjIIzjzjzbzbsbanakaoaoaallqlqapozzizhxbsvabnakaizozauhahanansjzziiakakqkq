@@ -1,5 +1,7 @@
 const { EmbedBuilder, PermissionsBitField } = require('discord.js');
 const { t } = require('../../utils/languages');
+const sharp = require('sharp');
+const axios = require('axios');
 
 async function execute(interaction, langCode) {
     if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageEmojisAndStickers)) {
@@ -26,19 +28,31 @@ async function execute(interaction, langCode) {
         return;
     }
 
+    await interaction.deferReply();
+
     try {
-        await interaction.guild.emojis.create({ attachment: emojiUrl, name: emojiName });
+        const response = await axios.get(emojiUrl, { responseType: 'arraybuffer' });
+        const buffer = Buffer.from(response.data, 'utf-8');
+        
+        // Enhance image using sharp (resize to larger and sharpen)
+        const enhancedBuffer = await sharp(buffer)
+            .resize(512, 512, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
+            .sharpen()
+            .toBuffer();
+
+        await interaction.guild.emojis.create({ attachment: enhancedBuffer, name: emojiName });
+        
         const embed = new EmbedBuilder()
-            .setDescription('✨ ' + await t('Emoji enhanced and added successfully!', langCode) + `\n**Name:** ${emojiName}`)
+            .setDescription('✨ ' + await t('Emoji enhanced (pixels added) and saved successfully!', langCode) + `\n**Name:** ${emojiName}`)
             .setColor('#00FF00')
             .setImage(emojiUrl)
             .setFooter({ text: `${interaction.user.displayName} (@${interaction.user.username})`, iconURL: interaction.user.displayAvatarURL() });
-        await interaction.reply({ embeds: [embed] });
+        await interaction.editReply({ embeds: [embed] });
     } catch (error) {
         const embed = new EmbedBuilder()
             .setDescription('❌ ' + await t('Error:', langCode) + ' ' + error.message)
             .setColor('#FF0000');
-        await interaction.reply({ embeds: [embed] });
+        await interaction.editReply({ embeds: [embed] });
     }
 }
 
