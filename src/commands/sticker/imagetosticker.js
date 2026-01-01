@@ -61,14 +61,13 @@ async function execute(interaction, langCode, convertedImagesToStickers) {
         let sharpInstance = sharp(inputBuffer);
 
         if (integrationOption) {
-            // Integration mode: Force square 512x512
+            // Integration mode: Force square 512x512 with FILL to cover the entire canvas
             sharpInstance = sharpInstance.resize(512, 512, {
-                fit: 'contain',
-                background: { r: 0, g: 0, b: 0, alpha: 0 }
+                fit: 'cover',
+                position: 'center'
             });
         } else {
-            // Original form mode: Just ensure it's a valid size and format without forcing square
-            // Discord stickers still need to be within certain limits, but we try to preserve aspect ratio
+            // Original form mode: Preserve aspect ratio within 512x512
             const metadata = await sharpInstance.metadata();
             const ratio = metadata.width / metadata.height;
             
@@ -100,7 +99,7 @@ async function execute(interaction, langCode, convertedImagesToStickers) {
 
         const embed = new EmbedBuilder()
             .setTitle('✅ ' + await t('Sticker Created!', langCode))
-            .setDescription(await t('Successfully converted image to sticker!', langCode) + `\n**Name:** ${cleanedName}\n**Mode:** ${integrationOption ? 'Integration (512x512)' : 'Original Form'}`)
+            .setDescription(await t('Successfully converted image to sticker!', langCode) + `\n**Name:** ${cleanedName}\n**Mode:** ${integrationOption ? 'Integration (Full 512x512)' : 'Original Form'}`)
             .setImage(finalUrl)
             .setColor('#00FF00');
 
