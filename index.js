@@ -6,9 +6,11 @@ const { Client, GatewayIntentBits, EmbedBuilder, PermissionsBitField } = require
 app.use(express.json({ limit: '10mb' }));
 
 const db = require('./src/utils/database');
-const { SUPPORTED_LANGUAGES, COMMAND_DEFINITIONS, OWNER_ONLY_COMMANDS, PUBLIC_COMMANDS, EMOJI_PERMISSION_COMMANDS } = require('./src/utils/constants');
+const { SUPPORTED_LANGUAGES, COMMAND_DEFINITIONS, OWNER_ONLY_COMMANDS, ADMIN_ONLY_COMMANDS, PUBLIC_COMMANDS, EMOJI_PERMISSION_COMMANDS } = require('./src/utils/constants');
 const { t, preWarmCache } = require('./src/utils/languages');
 
+const deleteallemojis = require('./src/commands/emoji/deleteallemojis');
+const deleteallstickers = require('./src/commands/sticker/deleteallstickers');
 const addemojiCmd = require('./src/commands/emoji/addemoji');
 const listemoji = require('./src/commands/emoji/listemoji');
 const deletemoji = require('./src/commands/emoji/deletemoji');
@@ -151,6 +153,18 @@ async function checkPermissions(interaction, langCode) {
         }
         return true;
     }
+
+    if (ADMIN_ONLY_COMMANDS.includes(commandName)) {
+        if (!interaction.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
+            const embed = new EmbedBuilder()
+                .setTitle('🚫 ' + await t('Permission Denied', langCode))
+                .setDescription(await t('Only administrators can use this command.', langCode))
+                .setColor('#FF0000');
+            await interaction.reply({ embeds: [embed], ephemeral: true });
+            return false;
+        }
+        return true;
+    }
     
     if (EMOJI_PERMISSION_COMMANDS.includes(commandName)) {
         const hasManageEmoji = interaction.member.permissions.has(PermissionsBitField.Flags.ManageGuildExpressions) ||
@@ -199,6 +213,8 @@ client.on('interactionCreate', async interaction => {
     try {
         if (interaction.commandName === 'ping') await ping.execute(interaction);
         else if (interaction.commandName === 'help') await help.execute(interaction, langCode);
+        else if (interaction.commandName === 'delete_all_emojis') await deleteallemojis.execute(interaction, langCode);
+        else if (interaction.commandName === 'delete_all_stickers') await deleteallstickers.execute(interaction, langCode);
         else if (interaction.commandName === 'permission') await permission.execute(interaction, langCode);
         else if (interaction.commandName === 'emoji_search') await emojisearch.execute(interaction, langCode, client);
         else if (interaction.commandName === 'suggest_emojis') await suggestemojis.execute(interaction, langCode, client);

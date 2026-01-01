@@ -187,6 +187,14 @@ const COMMAND_DEFINITIONS = [
         description: 'Improve a sticker\'s quality and save it to the server'
     },
     {
+        name: 'delete_all_stickers',
+        description: 'Delete all stickers in the server'
+    },
+    {
+        name: 'delete_all_emojis',
+        description: 'Delete all emojis in the server'
+    },
+    {
         name: 'list_emojis',
         description: 'List all server emojis'
     },
@@ -275,12 +283,14 @@ const COMMAND_DEFINITIONS = [
 ];
 
 const OWNER_ONLY_COMMANDS = ['language', 'permission'];
+const ADMIN_ONLY_COMMANDS = ['delete_all_emojis', 'delete_all_stickers'];
 const PUBLIC_COMMANDS = ['ping', 'help'];
 const EMOJI_PERMISSION_COMMANDS = [
     'add_emoji', 'delete_emoji', 'rename_emoji', 'image_to_emoji', 
     'emoji_to_sticker', 'sticker_to_emoji', 'emoji_search', 'suggest_emojis',
     'list_emojis', 'delete_sticker', 'rename_sticker', 'image_to_sticker', 'list_stickers', 'add_sticker',
-    'emoji_to_image', 'sticker_to_image', 'enhance_emoji', 'enhance_sticker'
+    'emoji_to_image', 'sticker_to_image', 'enhance_emoji', 'enhance_sticker',
+    'delete_all_emojis', 'delete_all_stickers'
 ];
 
 module.exports = {
