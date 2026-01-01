@@ -98,7 +98,7 @@ async function getServer(serverId) {
 
 async function addServer(serverId, serverName) {
     await pool.query(
-        'INSERT INTO servers (server_id, server_name) VALUES ($1, $2) ON CONFLICT (server_id) DO UPDATE SET server_name = $2',
+        'INSERT INTO servers (server_id, server_name, permission_enabled) VALUES ($1, $2, true) ON CONFLICT (server_id) DO UPDATE SET server_name = $2',
         [serverId, serverName]
     );
 }
