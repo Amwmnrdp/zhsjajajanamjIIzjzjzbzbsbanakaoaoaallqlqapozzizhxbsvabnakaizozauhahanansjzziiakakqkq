@@ -138,23 +138,21 @@ async function checkVerification(interaction, langCode) {
 async function checkPermissions(interaction, langCode) {
     const commandName = interaction.commandName;
     
-    if (PUBLIC_COMMANDS.includes(commandName)) {
-        return true;
-    }
-    
-    if (OWNER_ONLY_COMMANDS.includes(commandName)) {
-        if (!interaction.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
+    // Permission command: Only the Server Owner
+    if (commandName === 'permission') {
+        if (interaction.user.id !== interaction.guild.ownerId) {
             const embed = new EmbedBuilder()
                 .setTitle('🚫 ' + await t('Permission Denied', langCode))
-                .setDescription(await t('Only the server owner or administrators can use this command.', langCode))
+                .setDescription(await t('Only the server owner can use this command.', langCode))
                 .setColor('#FF0000');
             await interaction.reply({ embeds: [embed], ephemeral: true });
             return false;
         }
         return true;
     }
-
-    if (ADMIN_ONLY_COMMANDS.includes(commandName)) {
+    
+    // Language command: Administrator
+    if (commandName === 'language') {
         if (!interaction.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
             const embed = new EmbedBuilder()
                 .setTitle('🚫 ' + await t('Permission Denied', langCode))
@@ -166,19 +164,17 @@ async function checkPermissions(interaction, langCode) {
         return true;
     }
     
-    if (EMOJI_PERMISSION_COMMANDS.includes(commandName)) {
-        const hasManageEmoji = interaction.member.permissions.has(PermissionsBitField.Flags.ManageGuildExpressions) ||
-                               interaction.member.permissions.has(PermissionsBitField.Flags.ManageEmojisAndStickers);
-        
-        if (!hasManageEmoji) {
-            const embed = new EmbedBuilder()
-                .setTitle('🚫 ' + await t('Permission Denied', langCode))
-                .setDescription(await t('You need the "Manage Emojis and Stickers" permission to use this command.', langCode))
-                .setColor('#FF0000');
-            await interaction.reply({ embeds: [embed], ephemeral: true });
-            return false;
-        }
-        return true;
+    // All other commands: Manage Emojis and Stickers
+    const hasManageEmoji = interaction.member.permissions.has(PermissionsBitField.Flags.ManageGuildExpressions) ||
+                           interaction.member.permissions.has(PermissionsBitField.Flags.ManageEmojisAndStickers);
+    
+    if (!hasManageEmoji) {
+        const embed = new EmbedBuilder()
+            .setTitle('🚫 ' + await t('Permission Denied', langCode))
+            .setDescription(await t('You need the "Manage Emojis and Stickers" permission to use this command.', langCode))
+            .setColor('#FF0000');
+        await interaction.reply({ embeds: [embed], ephemeral: true });
+        return false;
     }
     
     return true;
