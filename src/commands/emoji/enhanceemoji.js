@@ -32,18 +32,39 @@ async function execute(interaction, langCode) {
 
     try {
         const response = await axios.get(emojiUrl, { responseType: 'arraybuffer' });
-        const buffer = Buffer.from(response.data, 'utf-8');
+        const buffer = Buffer.from(response.data);
         
-        // Enhance image using sharp (resize to larger and sharpen)
+        // Maximum strength enhancement
         const enhancedBuffer = await sharp(buffer)
-            .resize(512, 512, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
-            .sharpen()
+            .resize(1024, 1024, { 
+                fit: 'contain', 
+                background: { r: 0, g: 0, b: 0, alpha: 0 },
+                kernel: sharp.kernel.lanczos3 // High quality scaling
+            })
+            .modulate({
+                brightness: 1.1,
+                saturation: 1.2
+            })
+            .sharpen({
+                sigma: 1.5,
+                m1: 0.5,
+                m2: 10
+            })
             .toBuffer();
 
-        await interaction.guild.emojis.create({ attachment: enhancedBuffer, name: emojiName });
+        // Discord emojis have a 256KB limit
+        let finalBuffer = enhancedBuffer;
+        if (finalBuffer.length > 256000) {
+            finalBuffer = await sharp(enhancedBuffer)
+                .resize(512, 512)
+                .png({ quality: 90 })
+                .toBuffer();
+        }
+
+        await interaction.guild.emojis.create({ attachment: finalBuffer, name: emojiName });
         
         const embed = new EmbedBuilder()
-            .setDescription('✨ ' + await t('Emoji enhanced (pixels added) and saved successfully!', langCode) + `\n**Name:** ${emojiName}`)
+            .setDescription('✨ ' + await t('Emoji enhanced with maximum strength!', langCode) + `\n**Name:** ${emojiName}`)
             .setColor('#00FF00')
             .setImage(emojiUrl)
             .setFooter({ text: `${interaction.user.displayName} (@${interaction.user.username})`, iconURL: interaction.user.displayAvatarURL() });

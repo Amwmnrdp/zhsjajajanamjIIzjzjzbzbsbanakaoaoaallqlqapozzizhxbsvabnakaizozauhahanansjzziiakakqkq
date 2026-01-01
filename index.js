@@ -255,6 +255,7 @@ client.on('interactionCreate', async interaction => {
             setTimeout(() => stickerToEmojiSessions.has(msg.id) && stickerToEmojiSessions.delete(msg.id), 60000);
         }
         else if (interaction.commandName === 'image_to_sticker') await imagetosticker.execute(interaction, langCode, convertedImagesToStickers);
+        else if (interaction.commandName === 'emoji_to_sticker') await emojiTosticker.execute(interaction, langCode, convertedEmojisToStickers);
         else if (interaction.commandName === 'emoji_to_image') await emojitoimage.execute(interaction, langCode);
         else if (interaction.commandName === 'sticker_to_image') await stickertoimage.execute(interaction, langCode);
         else if (interaction.commandName === 'enhance_emoji') await enhanceemoji.execute(interaction, langCode);

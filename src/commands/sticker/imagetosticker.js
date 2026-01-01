@@ -13,6 +13,7 @@ async function execute(interaction, langCode, convertedImagesToStickers) {
     const nameOption = interaction.options.getString('name');
     const urlOption = interaction.options.getString('url');
     const attachment = interaction.options.getAttachment('attachment');
+    const integrationOption = interaction.options.getString('integration') === 'true';
 
     const cleanedName = nameOption.substring(0, 32);
     if (cleanedName.length < 2) {
@@ -57,26 +58,35 @@ async function execute(interaction, langCode, convertedImagesToStickers) {
         const response = await axios.get(finalUrl, { responseType: 'arraybuffer' });
         const inputBuffer = Buffer.from(response.data);
 
-        // Process image to meet Discord sticker requirements:
-        // 1. MUST be PNG
-        // 2. MUST be exactly 512x512
-        // 3. Size must be < 512KB (512,000 bytes)
-        let processedBuffer = await sharp(inputBuffer)
-            .resize(512, 512, {
+        let sharpInstance = sharp(inputBuffer);
+
+        if (integrationOption) {
+            // Integration mode: Force square 512x512
+            sharpInstance = sharpInstance.resize(512, 512, {
                 fit: 'contain',
                 background: { r: 0, g: 0, b: 0, alpha: 0 }
-            })
-            .png({ quality: 80, compressionLevel: 9 }) // Start with some compression
+            });
+        } else {
+            // Original form mode: Just ensure it's a valid size and format without forcing square
+            // Discord stickers still need to be within certain limits, but we try to preserve aspect ratio
+            const metadata = await sharpInstance.metadata();
+            const ratio = metadata.width / metadata.height;
+            
+            if (ratio > 1) {
+                sharpInstance = sharpInstance.resize(512, Math.round(512 / ratio));
+            } else {
+                sharpInstance = sharpInstance.resize(Math.round(512 * ratio), 512);
+            }
+        }
+
+        let processedBuffer = await sharpInstance
+            .png({ quality: 80, compressionLevel: 9 })
             .toBuffer();
 
-        // If still too large, aggressive compression
+        // Safety check for size
         if (processedBuffer.length > 512000) {
-            processedBuffer = await sharp(inputBuffer)
-                .resize(512, 512, {
-                    fit: 'contain',
-                    background: { r: 0, g: 0, b: 0, alpha: 0 }
-                })
-                .png({ palette: true, colors: 128 }) // Use palette to significantly reduce size
+            processedBuffer = await sharp(processedBuffer)
+                .png({ palette: true, colors: 128 })
                 .toBuffer();
         }
 
@@ -90,7 +100,7 @@ async function execute(interaction, langCode, convertedImagesToStickers) {
 
         const embed = new EmbedBuilder()
             .setTitle('✅ ' + await t('Sticker Created!', langCode))
-            .setDescription(await t('Successfully converted image to sticker!', langCode) + `\n**Name:** ${cleanedName}`)
+            .setDescription(await t('Successfully converted image to sticker!', langCode) + `\n**Name:** ${cleanedName}\n**Mode:** ${integrationOption ? 'Integration (512x512)' : 'Original Form'}`)
             .setImage(finalUrl)
             .setColor('#00FF00');
 
@@ -102,15 +112,9 @@ async function execute(interaction, langCode, convertedImagesToStickers) {
         });
     } catch (error) {
         let errorMsg = error.message;
-        if (error.code === 50045 || error.message.includes('maximum size')) {
-            errorMsg = 'Asset exceeds maximum size: The sticker must be under 512KB. Try using a smaller or simpler image.';
-        } else if (error.code === 50046) {
-            errorMsg = 'Invalid Asset: The image format or dimensions are incorrect for a sticker.';
-        }
-        
+        if (error.code === 50045) errorMsg = 'Asset exceeds maximum size (512KB).';
         const embed = new EmbedBuilder().setDescription(`❌ ${errorMsg}`).setColor('#FF0000');
         await interaction.editReply({ embeds: [embed] });
-        console.error(`⚠️ Sticker Error [${error.code}]:`, error);
     }
 }
 

@@ -116,6 +116,33 @@ const COMMAND_DEFINITIONS = [
                 type: 3,
                 description: 'Image URL',
                 required: false
+            },
+            {
+                name: 'integration',
+                type: 3,
+                description: 'Enable official sticker integration (Yes/No)',
+                required: false,
+                choices: [
+                    { name: 'Yes', value: 'true' }
+                ]
+            }
+        ]
+    },
+    {
+        name: 'emoji_to_sticker',
+        description: 'Convert emoji to sticker',
+        options: [
+            {
+                name: 'emoji',
+                type: 3,
+                description: 'The emoji to convert',
+                required: true
+            },
+            {
+                name: 'name',
+                type: 3,
+                description: 'Sticker name',
+                required: true
             }
         ]
     },
