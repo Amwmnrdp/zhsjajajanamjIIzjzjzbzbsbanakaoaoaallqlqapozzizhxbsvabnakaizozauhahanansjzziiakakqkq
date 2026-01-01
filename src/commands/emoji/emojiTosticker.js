@@ -4,8 +4,14 @@ const axios = require('axios');
 const sharp = require('sharp');
 
 async function execute(interaction, langCode, convertedEmojisToStickers) {
-    if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageEmojisAndStickers)) {
-        const embed = new EmbedBuilder().setDescription('❌ ' + await t('Need permission!', langCode)).setColor('#FF0000');
+    const hasManageEmoji = interaction.member.permissions.has(PermissionsBitField.Flags.ManageGuildExpressions) ||
+                           interaction.member.permissions.has(PermissionsBitField.Flags.ManageEmojisAndStickers);
+    
+    if (!hasManageEmoji) {
+        const embed = new EmbedBuilder()
+            .setTitle('🚫 ' + await t('Permission Denied', langCode))
+            .setDescription(await t('You need the "Manage Emojis and Stickers" permission to use this command.', langCode))
+            .setColor('#FF0000');
         await interaction.reply({ embeds: [embed], ephemeral: true });
         return;
     }
@@ -27,13 +33,13 @@ async function execute(interaction, langCode, convertedEmojisToStickers) {
         return;
     }
 
-    await interaction.deferReply();
+    await interaction.deferReply({ ephemeral: true });
 
     try {
         const response = await axios.get(emojiUrl, { responseType: 'arraybuffer' });
         const inputBuffer = Buffer.from(response.data);
 
-        // Standardized sticker processing
+        // Standardized sticker processing: Force 512x512 PNG
         const processedBuffer = await sharp(inputBuffer)
             .resize(512, 512, { 
                 fit: 'contain', 
@@ -44,7 +50,7 @@ async function execute(interaction, langCode, convertedEmojisToStickers) {
 
         const sticker = await interaction.guild.stickers.create({
             file: processedBuffer,
-            name: nameOption,
+            name: nameOption.substring(0, 32),
             description: 'Converted from emoji by ProEmoji',
             tags: 'emoji',
             reason: `By ${interaction.user.tag}`
@@ -54,7 +60,7 @@ async function execute(interaction, langCode, convertedEmojisToStickers) {
             .setTitle('✅ ' + await t('Sticker Created!', langCode))
             .setDescription(await t('Emoji converted to sticker successfully!', langCode) + `\n**Name:** ${nameOption}`)
             .setImage(emojiUrl)
-            .setColor('#00FF00');
+            .setColor('#ADD8E6');
 
         await interaction.editReply({ embeds: [embed] });
     } catch (error) {
