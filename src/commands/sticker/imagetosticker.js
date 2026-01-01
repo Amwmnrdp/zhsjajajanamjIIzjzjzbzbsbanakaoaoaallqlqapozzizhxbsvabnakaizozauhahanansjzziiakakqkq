@@ -58,16 +58,27 @@ async function execute(interaction, langCode, convertedImagesToStickers) {
         const inputBuffer = Buffer.from(response.data);
 
         // Process image to meet Discord sticker requirements:
-        // 1. MUST be PNG, APNG, or Lottie (we'll force PNG)
+        // 1. MUST be PNG
         // 2. MUST be exactly 512x512
-        // 3. Size must be < 512KB
-        const processedBuffer = await sharp(inputBuffer)
+        // 3. Size must be < 512KB (512,000 bytes)
+        let processedBuffer = await sharp(inputBuffer)
             .resize(512, 512, {
                 fit: 'contain',
                 background: { r: 0, g: 0, b: 0, alpha: 0 }
             })
-            .png()
+            .png({ quality: 80, compressionLevel: 9 }) // Start with some compression
             .toBuffer();
+
+        // If still too large, aggressive compression
+        if (processedBuffer.length > 512000) {
+            processedBuffer = await sharp(inputBuffer)
+                .resize(512, 512, {
+                    fit: 'contain',
+                    background: { r: 0, g: 0, b: 0, alpha: 0 }
+                })
+                .png({ palette: true, colors: 128 }) // Use palette to significantly reduce size
+                .toBuffer();
+        }
 
         const sticker = await interaction.guild.stickers.create({
             file: processedBuffer,
@@ -91,10 +102,10 @@ async function execute(interaction, langCode, convertedImagesToStickers) {
         });
     } catch (error) {
         let errorMsg = error.message;
-        if (error.code === 50046) {
-            errorMsg = 'Invalid Asset: The image could not be processed into a valid Discord sticker format. Ensure it\'s a standard image file.';
-        } else if (error.code === 50035) {
-            errorMsg = 'Invalid Form Body: Check the sticker name and file size.';
+        if (error.code === 50045 || error.message.includes('maximum size')) {
+            errorMsg = 'Asset exceeds maximum size: The sticker must be under 512KB. Try using a smaller or simpler image.';
+        } else if (error.code === 50046) {
+            errorMsg = 'Invalid Asset: The image format or dimensions are incorrect for a sticker.';
         }
         
         const embed = new EmbedBuilder().setDescription(`❌ ${errorMsg}`).setColor('#FF0000');
