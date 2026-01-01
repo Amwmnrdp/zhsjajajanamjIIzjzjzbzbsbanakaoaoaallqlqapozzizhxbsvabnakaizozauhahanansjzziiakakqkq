@@ -1,7 +1,7 @@
 const { EmbedBuilder, PermissionsBitField } = require('discord.js');
-const isImageUrl = require('is-image-url');
 const { t } = require('../../utils/languages');
 const axios = require('axios');
+const sharp = require('sharp');
 
 async function execute(interaction, langCode, convertedImagesToStickers) {
     if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageEmojisAndStickers)) {
@@ -54,12 +54,23 @@ async function execute(interaction, langCode, convertedImagesToStickers) {
     }
 
     try {
-        // Fetch the image as a buffer to ensure it's a valid asset for stickers
         const response = await axios.get(finalUrl, { responseType: 'arraybuffer' });
-        const buffer = Buffer.from(response.data, 'utf-8');
+        const inputBuffer = Buffer.from(response.data);
+
+        // Process image to meet Discord sticker requirements:
+        // 1. MUST be PNG, APNG, or Lottie (we'll force PNG)
+        // 2. MUST be exactly 512x512
+        // 3. Size must be < 512KB
+        const processedBuffer = await sharp(inputBuffer)
+            .resize(512, 512, {
+                fit: 'contain',
+                background: { r: 0, g: 0, b: 0, alpha: 0 }
+            })
+            .png()
+            .toBuffer();
 
         const sticker = await interaction.guild.stickers.create({
-            file: buffer,
+            file: processedBuffer,
             name: cleanedName,
             description: 'Converted by ProEmoji',
             tags: 'emoji',
@@ -79,10 +90,16 @@ async function execute(interaction, langCode, convertedImagesToStickers) {
             imageUrl: finalUrl
         });
     } catch (error) {
-        const errorMsg = error.code === 50035 ? 'Invalid Asset or Format' : error.message;
+        let errorMsg = error.message;
+        if (error.code === 50046) {
+            errorMsg = 'Invalid Asset: The image could not be processed into a valid Discord sticker format. Ensure it\'s a standard image file.';
+        } else if (error.code === 50035) {
+            errorMsg = 'Invalid Form Body: Check the sticker name and file size.';
+        }
+        
         const embed = new EmbedBuilder().setDescription(`❌ ${errorMsg}`).setColor('#FF0000');
         await interaction.editReply({ embeds: [embed] });
-        console.error(`⚠️ Sticker Error:`, error);
+        console.error(`⚠️ Sticker Error [${error.code}]:`, error);
     }
 }
 
