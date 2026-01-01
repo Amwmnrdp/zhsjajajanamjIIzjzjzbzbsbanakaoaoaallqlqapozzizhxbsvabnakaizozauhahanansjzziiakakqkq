@@ -4,34 +4,47 @@ const sharp = require('sharp');
 const axios = require('axios');
 
 async function execute(interaction, langCode) {
-    if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageEmojisAndStickers)) {
-        const embed = new EmbedBuilder().setDescription('❌ ' + await t('Need permission!', langCode)).setColor('#FF0000');
-        await interaction.reply({ embeds: [embed], ephemeral: true });
-        return;
-    }
-
-    const messages = await interaction.channel.messages.fetch({ limit: 20 });
-    const stickerMessage = messages.find(m => m.stickers.size > 0);
-
-    if (!stickerMessage) {
+    const hasManageEmoji = interaction.member.permissions.has(PermissionsBitField.Flags.ManageGuildExpressions) ||
+                           interaction.member.permissions.has(PermissionsBitField.Flags.ManageEmojisAndStickers);
+    
+    if (!hasManageEmoji) {
         const embed = new EmbedBuilder()
-            .setDescription('❌ ' + await t('No message with a sticker found nearby!', langCode))
+            .setTitle('🚫 ' + await t('Permission Denied', langCode))
+            .setDescription(await t('You need the "Manage Emojis and Stickers" permission to use this command.', langCode))
             .setColor('#FF0000');
         await interaction.reply({ embeds: [embed], ephemeral: true });
         return;
     }
 
-    await interaction.deferReply();
+    // Interaction handling for stickers via reply
+    let sticker = null;
+    let stickerUrl = '';
+    let stickerName = '';
 
-    const sticker = stickerMessage.stickers.first();
-    const stickerUrl = sticker.url;
-    const stickerName = sticker.name.substring(0, 22) + '_enhanced';
+    // Check if the command was used as a reply to a message containing a sticker
+    const message = await interaction.channel.messages.fetch(interaction.id).catch(() => null);
+    const messages = await interaction.channel.messages.fetch({ limit: 20 });
+    const stickerMessage = messages.find(m => m.stickers.size > 0);
+
+    if (!stickerMessage) {
+        const embed = new EmbedBuilder()
+            .setDescription('❌ ' + await t('No message with a sticker found nearby! Please reply to a message with a sticker.', langCode))
+            .setColor('#FF0000');
+        await interaction.reply({ embeds: [embed], ephemeral: true });
+        return;
+    }
+
+    await interaction.deferReply({ ephemeral: true });
+
+    sticker = stickerMessage.stickers.first();
+    stickerUrl = sticker.url;
+    stickerName = sticker.name.substring(0, 22) + '_enhanced';
 
     try {
         const response = await axios.get(stickerUrl, { responseType: 'arraybuffer' });
         const buffer = Buffer.from(response.data);
 
-        // Maximum strength enhancement
+        // Maximum strength enhancement: Lanczos3 scaling + Sharpen + Modulate
         const enhancedBuffer = await sharp(buffer)
             .resize(512, 512, { 
                 fit: 'contain', 
@@ -43,9 +56,9 @@ async function execute(interaction, langCode) {
                 saturation: 1.15
             })
             .sharpen({
-                sigma: 1.2,
-                m1: 0.3,
-                m2: 8
+                sigma: 1.5,
+                m1: 0.5,
+                m2: 10
             })
             .toBuffer();
 
@@ -67,7 +80,7 @@ async function execute(interaction, langCode) {
 
         const embed = new EmbedBuilder()
             .setDescription('✨ ' + await t('Sticker enhanced with maximum strength!', langCode) + `\n**Name:** ${stickerName}`)
-            .setColor('#00FF00')
+            .setColor('#ADD8E6')
             .setImage(stickerUrl)
             .setFooter({ text: `${interaction.user.displayName} (@${interaction.user.username})`, iconURL: interaction.user.displayAvatarURL() });
         await interaction.editReply({ embeds: [embed] });

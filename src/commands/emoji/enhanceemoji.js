@@ -34,21 +34,21 @@ async function execute(interaction, langCode) {
         const response = await axios.get(emojiUrl, { responseType: 'arraybuffer' });
         const buffer = Buffer.from(response.data);
         
-        // Maximum strength enhancement
+        // Maximum strength enhancement: Lanczos3 scaling + Sharpen + Modulate
         const enhancedBuffer = await sharp(buffer)
             .resize(1024, 1024, { 
                 fit: 'contain', 
                 background: { r: 0, g: 0, b: 0, alpha: 0 },
-                kernel: sharp.kernel.lanczos3 // High quality scaling
+                kernel: sharp.kernel.lanczos3
             })
             .modulate({
                 brightness: 1.1,
-                saturation: 1.2
+                saturation: 1.25
             })
             .sharpen({
-                sigma: 1.5,
-                m1: 0.5,
-                m2: 10
+                sigma: 1.8,
+                m1: 0.6,
+                m2: 12
             })
             .toBuffer();
 
@@ -65,7 +65,7 @@ async function execute(interaction, langCode) {
         
         const embed = new EmbedBuilder()
             .setDescription('✨ ' + await t('Emoji enhanced with maximum strength!', langCode) + `\n**Name:** ${emojiName}`)
-            .setColor('#00FF00')
+            .setColor('#ADD8E6')
             .setImage(emojiUrl)
             .setFooter({ text: `${interaction.user.displayName} (@${interaction.user.username})`, iconURL: interaction.user.displayAvatarURL() });
         await interaction.editReply({ embeds: [embed] });
